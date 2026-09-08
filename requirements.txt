@@ -1,0 +1,14 @@
+# Bibliotecas usadas pelo projeto no Google Colab.
+#
+# Este arquivo é apenas documentação/referência: a execução acontece no
+# Colab, onde praticamente todas estas bibliotecas já vêm instaladas.
+# Não é necessário instalar nada localmente para editar o código.
+
+tensorflow
+opencv-python
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+tqdm

@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Artefatos de treino (gerados no Colab, não versionados)
+*.h5
+*.keras
+
+# Sistema
+.DS_Store
