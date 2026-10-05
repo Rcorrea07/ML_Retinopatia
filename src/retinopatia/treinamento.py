@@ -1,7 +1,7 @@
 """
 Treino do modelo em duas fases.
 
-Fase 1: a EfficientNetB0 fica congelada e apenas a cabeça é treinada,
+Fase 1: a EfficientNet fica congelada e apenas as cabeças são treinadas,
 com uma taxa de aprendizado alta.
 
 Fase 2 (fine-tuning): a rede base é descongelada, mas as camadas de
@@ -11,6 +11,10 @@ aprendizado bem menor.
 
 As duas fases usam callbacks com a mesma estrutura, criada por
 `criar_callbacks`, mudando apenas o arquivo de pesos e as paciências.
+
+O desbalanceamento entre as classes é compensado com pesos por amostra
+(`sample_weight`) acrescentados ao pipeline de treino: o argumento
+`class_weight` do Keras não funciona em modelos com mais de uma saída.
 """
 
 import numpy as np
@@ -23,7 +27,7 @@ from tensorflow.keras.callbacks import (
 )
 
 from . import configuracao
-from .modelo import criar_metricas
+from .modelo import compilar_modelo
 
 
 def calcular_pesos_classe(df_treino):
@@ -86,6 +90,33 @@ def calcular_pesos_classe(df_treino):
     )
 
     return pesos_dicionario
+
+
+def adicionar_pesos_amostra(treino_data, pesos_dicionario):
+    """
+    Acrescenta a cada lote de treino o peso de cada amostra, de acordo
+    com a sua classe binária, no formato (x, rótulos, pesos).
+
+    O mesmo peso vale para as duas saídas do modelo.
+    """
+
+    pesos = tf.constant(
+        [pesos_dicionario[0], pesos_dicionario[1]],
+        dtype=tf.float32
+    )
+
+    def com_pesos(x, rotulos):
+        classes = tf.cast(
+            tf.reshape(rotulos[configuracao.SAIDA_DOENTE], [-1]),
+            tf.int32
+        )
+
+        return x, rotulos, tf.gather(pesos, classes)
+
+    return treino_data.map(
+        com_pesos,
+        num_parallel_calls=tf.data.AUTOTUNE
+    ).prefetch(tf.data.AUTOTUNE)
 
 
 def criar_callbacks(
@@ -174,22 +205,20 @@ def treinar_fase1(
     caminho_pesos=configuracao.CAMINHO_PESOS_FASE1
 ):
     """
-    Treina apenas a cabeça da rede e recarrega o melhor checkpoint ao
+    Treina apenas as cabeças da rede e recarrega o melhor checkpoint ao
     final, deixando o modelo pronto para a avaliação.
 
     Retorna o histórico do treino.
     """
 
-    print(" Ininiando o treinamento...")
+    print("Iniciando o treinamento...")
 
     historico = modelo.fit(
-        treino_data,
+        # Os pesos por amostra compensam o desbalanceamento das classes
+        adicionar_pesos_amostra(treino_data, pesos_dicionario),
         validation_data=val_data,
         epochs=epocas,
-        callbacks=callbacks,
-
-        # O superpoder para lidar com o desbalanceamento
-        class_weight=pesos_dicionario
+        callbacks=callbacks
     )
 
     print("\n Treino da Fase 1 concluído com sucesso!")
@@ -239,22 +268,15 @@ def fine_tuning_fase2(
             layer.trainable = False
 
     # Recompila obrigatoriamente depois de alterar trainable
-    modelo.compile(
-        optimizer=tf.keras.optimizers.Adam(
-            learning_rate=taxa_aprendizado
-        ),
-        loss=tf.keras.losses.BinaryCrossentropy(),
-        metrics=criar_metricas()
-    )
+    compilar_modelo(modelo, taxa_aprendizado)
 
     print("Iniciando o treinamento da Fase 2...")
 
     historico_fase2 = modelo.fit(
-        treino_data,
+        adicionar_pesos_amostra(treino_data, pesos_dicionario),
         validation_data=val_data,
         epochs=epocas,
-        callbacks=callbacks,
-        class_weight=pesos_dicionario
+        callbacks=callbacks
     )
 
     print("Carregando o melhor checkpoint da Fase 2 para avaliação...")

@@ -1,14 +1,21 @@
 """
 Carregamento do CSV, engenharia dos rótulos e divisão estratificada
-agrupada por paciente.
+agrupada por paciente em treino, validação e teste.
 
 O grau original de severidade (0 a 4) é preservado na coluna
 `level_original` e colapsado em uma classe binária na coluna `target`:
 grau 0 vira 0 (saudável) e os graus 1 a 4 viram 1 (com retinopatia).
+O modelo usa as duas colunas: `target` na decisão binária e
+`level_original` na cabeça auxiliar de grau.
+
+Os três conjuntos têm papéis distintos: o treino ajusta os pesos, a
+validação escolhe o checkpoint e o limiar de decisão, e o teste só é
+usado no fim, para medir o desempenho sem viés de seleção.
 """
 
 import os
 
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -135,15 +142,20 @@ def extrair_identificador_paciente(dados):
     return dados
 
 
-def dividir_treino_validacao(
+def dividir_treino_validacao_teste(
     dados,
     seed=configuracao.SEED,
-    numero_splits=configuracao.NUMERO_SPLITS
+    numero_splits=configuracao.NUMERO_SPLITS,
+    dobra_teste=configuracao.DOBRA_TESTE,
+    dobra_validacao=configuracao.DOBRA_VALIDACAO
 ):
     """
-    Divide os dados em treino e validação mantendo os dois olhos do
-    mesmo paciente no mesmo conjunto e estratificando pelos cinco graus
-    originais de severidade.
+    Divide os dados em treino, validação e teste mantendo os dois olhos
+    do mesmo paciente no mesmo conjunto e estratificando pelos cinco
+    graus originais de severidade.
+
+    Uma dobra do StratifiedGroupKFold vira teste, outra vira validação
+    e as demais formam o treino.
     """
 
     divisor = StratifiedGroupKFold(
@@ -152,8 +164,9 @@ def dividir_treino_validacao(
         random_state=seed
     )
 
-    indices_treino, indices_val = next(
-        divisor.split(
+    dobras = [
+        indices_dobra
+        for _, indices_dobra in divisor.split(
             X=dados["image"],
 
             # Estratifica usando os cinco graus originais
@@ -162,61 +175,81 @@ def dividir_treino_validacao(
             # Mantém os dois olhos do mesmo paciente juntos
             groups=dados["patient_id"]
         )
+    ]
+
+    indices_teste = dobras[dobra_teste]
+    indices_val = dobras[dobra_validacao]
+
+    indices_treino = np.setdiff1d(
+        np.arange(len(dados)),
+        np.concatenate([indices_teste, indices_val])
     )
 
-    df_treino = dados.iloc[
-        indices_treino
-    ].copy()
+    df_treino = dados.iloc[indices_treino].copy()
+    df_val = dados.iloc[indices_val].copy()
+    df_teste = dados.iloc[indices_teste].copy()
 
-    df_val = dados.iloc[
-        indices_val
-    ].copy()
+    verificar_pacientes_disjuntos(df_treino, df_val, df_teste)
 
-    # Verifica se há pacientes repetidos entre os conjuntos
-    pacientes_treino = set(
-        df_treino["patient_id"]
+    return df_treino, df_val, df_teste
+
+
+def verificar_pacientes_disjuntos(df_treino, df_val, df_teste):
+    """
+    Garante que nenhum paciente aparece em mais de um conjunto.
+    """
+
+    pacientes_treino = set(df_treino["patient_id"])
+    pacientes_val = set(df_val["patient_id"])
+    pacientes_teste = set(df_teste["patient_id"])
+
+    assert pacientes_treino.isdisjoint(pacientes_val), (
+        "Erro: existem pacientes repetidos entre treino e validação."
     )
 
-    pacientes_val = set(
-        df_val["patient_id"]
+    assert pacientes_treino.isdisjoint(pacientes_teste), (
+        "Erro: existem pacientes repetidos entre treino e teste."
     )
 
-    assert pacientes_treino.isdisjoint(
-        pacientes_val
-    ), (
-        "Erro: existem pacientes repetidos "
-        "entre treino e validação."
+    assert pacientes_val.isdisjoint(pacientes_teste), (
+        "Erro: existem pacientes repetidos entre validação e teste."
     )
 
     print(
-        "\nNenhum paciente aparece simultaneamente "
-        "no treino e na validação."
+        "\nNenhum paciente aparece em mais de um conjunto "
+        "(treino, validação e teste)."
     )
 
-    # O flow_from_dataframe com class_mode="binary"
-    # trabalha corretamente com as classes como strings.
-    df_treino["target"] = (
-        df_treino["target"]
-        .astype(str)
-    )
 
-    df_val["target"] = (
-        df_val["target"]
-        .astype(str)
-    )
+def _caminhos_splits(
+    pasta_splits=configuracao.PASTA_SPLITS,
+    seed=configuracao.SEED,
+    versao=configuracao.VERSAO_SPLIT
+):
+    """
+    Monta os caminhos dos CSVs de split, versionados pelo esquema de
+    divisão e pela semente.
+    """
 
-    return df_treino, df_val
+    return {
+        nome: os.path.join(
+            pasta_splits,
+            f"{nome}_{versao}_seed_{seed}.csv"
+        )
+        for nome in ["treino", "validacao", "teste"]
+    }
 
 
 def salvar_splits(
     df_treino,
     df_val,
+    df_teste,
     pasta_splits=configuracao.PASTA_SPLITS,
     seed=configuracao.SEED
 ):
     """
-    Salva os conjuntos no Google Drive em arquivos versionados pela
-    semente, permitindo reproduzir a mesma divisão em outras sessões.
+    Salva os conjuntos no Google Drive, permitindo reproduzir a mesma
+    divisão em outras sessões.
     """
 
     # Cria a pasta caso ainda não exista
@@ -225,42 +258,70 @@ def salvar_splits(
         exist_ok=True
     )
 
-    caminho_split_treino = os.path.join(
-        pasta_splits,
-        f"treino_seed_{seed}.csv"
-    )
+    caminhos = _caminhos_splits(pasta_splits, seed)
 
-    caminho_split_validacao = os.path.join(
-        pasta_splits,
-        f"validacao_seed_{seed}.csv"
-    )
-
-    df_treino.to_csv(
-        caminho_split_treino,
-        index=False
-    )
-
-    df_val.to_csv(
-        caminho_split_validacao,
-        index=False
-    )
+    for nome, df in zip(
+        ["treino", "validacao", "teste"],
+        [df_treino, df_val, df_teste]
+    ):
+        df.to_csv(caminhos[nome], index=False)
 
     print("\nSplits salvos com sucesso:")
 
-    print(
-        "Treino:",
-        caminho_split_treino
+    for nome, caminho in caminhos.items():
+        print(f"{nome}: {caminho}")
+
+    return caminhos
+
+
+def carregar_splits(
+    dados,
+    pasta_splits=configuracao.PASTA_SPLITS,
+    seed=configuracao.SEED
+):
+    """
+    Carrega os splits salvos anteriormente, se os três existirem.
+
+    Retorna (df_treino, df_val, df_teste) ou None quando algum arquivo
+    estiver faltando. Interrompe com erro se os splits não baterem com
+    o CSV atual (imagens desconhecidas ou pacientes repetidos).
+    """
+
+    caminhos = _caminhos_splits(pasta_splits, seed)
+
+    if not all(os.path.isfile(c) for c in caminhos.values()):
+        return None
+
+    conjuntos = [
+        pd.read_csv(
+            caminhos[nome],
+            dtype={"image": str, "patient_id": str}
+        )
+        for nome in ["treino", "validacao", "teste"]
+    ]
+
+    imagens_salvas = set().union(
+        *(set(df["image"]) for df in conjuntos)
     )
 
-    print(
-        "Validação:",
-        caminho_split_validacao
-    )
+    if imagens_salvas != set(dados["image"]):
+        raise ValueError(
+            "Os splits salvos não correspondem às imagens do CSV atual. "
+            "Apague os arquivos em "
+            f"{pasta_splits} ou mude VERSAO_SPLIT."
+        )
 
-    return caminho_split_treino, caminho_split_validacao
+    verificar_pacientes_disjuntos(*conjuntos)
+
+    print("\nSplits carregados de:")
+
+    for nome, caminho in caminhos.items():
+        print(f"{nome}: {caminho}")
+
+    return tuple(conjuntos)
 
 
-def resumir_conjuntos(dados, df_treino, df_val):
+def resumir_conjuntos(dados, df_treino, df_val, df_teste):
     """
     Mostra o tamanho dos conjuntos e a distribuição das classes.
     """
@@ -270,27 +331,25 @@ def resumir_conjuntos(dados, df_treino, df_val):
         f"{len(dados)}"
     )
 
-    print(
-        f"Imagens separadas para TREINO: "
-        f"{len(df_treino)}"
-    )
+    conjuntos = {
+        "TREINO": df_treino,
+        "VALIDAÇÃO": df_val,
+        "TESTE": df_teste
+    }
 
-    print(
-        f"Imagens separadas para VALIDAÇÃO: "
-        f"{len(df_val)}"
-    )
+    for nome, df in conjuntos.items():
+        print(
+            f"Imagens separadas para {nome}: {len(df)} "
+            f"({df['patient_id'].nunique()} pacientes)"
+        )
 
-    print("\nDistribuição dos graus originais no TREINO:")
-    _mostrar_distribuicao(df_treino, "level_original")
+    for nome, df in conjuntos.items():
+        print(f"\nDistribuição dos graus originais no {nome}:")
+        _mostrar_distribuicao(df, "level_original")
 
-    print("\nDistribuição dos graus originais na VALIDAÇÃO:")
-    _mostrar_distribuicao(df_val, "level_original")
-
-    print("\nDistribuição binária no TREINO:")
-    _mostrar_distribuicao(df_treino, "target")
-
-    print("\nDistribuição binária na VALIDAÇÃO:")
-    _mostrar_distribuicao(df_val, "target")
+    for nome, df in conjuntos.items():
+        print(f"\nDistribuição binária no {nome}:")
+        _mostrar_distribuicao(df, "target")
 
 
 def _mostrar_distribuicao(df, coluna):
@@ -315,11 +374,14 @@ def preparar_dataset(
 ):
     """
     Executa o preparo completo dos dados: leitura do CSV, criação da
-    classe binária, identificação do paciente, divisão agrupada e
-    salvamento dos splits.
+    classe binária, identificação do paciente e divisão agrupada em
+    treino, validação e teste.
+
+    Se os splits desta versão e semente já estiverem salvos no Drive,
+    eles são reutilizados em vez de recalculados.
 
     Retorna:
-        (dados, df_treino, df_val)
+        (dados, df_treino, df_val, df_teste)
     """
 
     dados = carregar_csv(caminho_csv)
@@ -341,22 +403,33 @@ def preparar_dataset(
         .to_string(index=False)
     )
 
-    df_treino, df_val = dividir_treino_validacao(
+    conjuntos = carregar_splits(
         dados,
-        seed=seed
-    )
-
-    salvar_splits(
-        df_treino,
-        df_val,
         pasta_splits=pasta_splits,
         seed=seed
     )
 
+    if conjuntos is None:
+        print("\nNenhum split salvo encontrado. Criando a divisão...")
+
+        conjuntos = dividir_treino_validacao_teste(
+            dados,
+            seed=seed
+        )
+
+        salvar_splits(
+            *conjuntos,
+            pasta_splits=pasta_splits,
+            seed=seed
+        )
+
+    df_treino, df_val, df_teste = conjuntos
+
     resumir_conjuntos(
         dados,
         df_treino,
-        df_val
+        df_val,
+        df_teste
     )
 
-    return dados, df_treino, df_val
+    return dados, df_treino, df_val, df_teste
