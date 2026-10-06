@@ -54,8 +54,10 @@ def criar_mascara_retina(
 
     Com "limiar_fixo", mantém os pixels acima de `limiar`, fica só com a
     maior região conexa e preenche a sua envoltória convexa, o que fecha
-    buracos (como a fóvea escura) e reentrâncias. Com "otsu", reproduz a
-    máscara da v2.
+    buracos (como a fóvea escura) e reentrâncias. Em fotos quase
+    totalmente pretas o limiar fixo não acha uma retina de tamanho
+    plausível; nesses casos a máscara volta a ser a de Otsu. Com "otsu",
+    reproduz a máscara da v2.
     """
 
     if metodo_mascara not in ("limiar_fixo", "otsu"):
@@ -77,15 +79,15 @@ def criar_mascara_retina(
         0
     )
 
-    if metodo_mascara == "otsu":
-        _, mascara = cv2.threshold(
-            gray_blur,
-            0,
-            255,
-            cv2.THRESH_BINARY + cv2.THRESH_OTSU
-        )
+    _, mascara_otsu = cv2.threshold(
+        gray_blur,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
 
-        return mascara
+    if metodo_mascara == "otsu":
+        return mascara_otsu
 
     _, mascara = cv2.threshold(
         gray_blur,
@@ -100,12 +102,17 @@ def criar_mascara_retina(
         cv2.CHAIN_APPROX_SIMPLE
     )
 
-    # Sem nenhum contorno a máscara fica vazia, e o recorte registra
-    # a falha como "mascara_vazia"
     if not contornos:
-        return mascara
+        return mascara_otsu
 
     maior_contorno = max(contornos, key=cv2.contourArea)
+
+    _, _, largura, altura = cv2.boundingRect(maior_contorno)
+
+    if max(largura, altura) < (
+        configuracao.FRACAO_MINIMA_DIAMETRO_RETINA * min(gray.shape)
+    ):
+        return mascara_otsu
 
     mascara = np.zeros_like(mascara)
 

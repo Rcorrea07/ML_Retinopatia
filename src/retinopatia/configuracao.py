@@ -132,6 +132,12 @@ METODO_MASCARA = "limiar_fixo"
 # Limiar, em tons de cinza de 0 a 255, que separa a retina do fundo preto
 LIMIAR_MASCARA = 10
 
+# Se a região achada pelo limiar fixo tiver diâmetro menor que esta
+# fração do menor lado da foto, a foto é escura demais para o limiar
+# fixo e a máscara volta a ser a de Otsu (que processou essas fotos na
+# v2). Na primeira execução da v3, 4 das 35.126 fotos caíram nesse caso.
+FRACAO_MINIMA_DIAMETRO_RETINA = 0.25
+
 # Com True (v3), a média local da normalização de Ben é calculada só
 # dentro da retina e o resto vira COR_FUNDO. Com False (v2), o
 # desfoque mistura a retina com o preto do preenchimento e cria faixas
