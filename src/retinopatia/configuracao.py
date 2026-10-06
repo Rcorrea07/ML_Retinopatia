@@ -15,12 +15,20 @@ Nesses casos, regenere os caches ou mude a versão no caminho
 """
 
 import os
+import subprocess
 
 # ============================================================
 # REPRODUTIBILIDADE
 # ============================================================
 
 SEED = 42
+
+# Operações determinísticas no TensorFlow. Garantem o mesmo resultado a
+# cada execução, mas podem deixar o treino mais lento ou falhar em
+# operações sem implementação determinística na GPU. Se
+# `pipeline_dados.medir_velocidade` ou o tempo por época mostrarem
+# gargalo, ou se aparecer erro de determinismo, desligue.
+OPERACOES_DETERMINISTICAS = True
 
 # ============================================================
 # CAMINHOS (ambiente do Google Colab)
@@ -43,9 +51,19 @@ CAMINHO_CSV = os.path.join(
     "trainLabels.csv"
 )
 
-PASTA_SPLITS = (
-    "/content/drive/MyDrive/"
-    "ProjetoRetinopatia/splits"
+# Pasta do projeto no Drive: tudo o que precisa sobreviver a uma
+# desconexão do Colab fica aqui (o disco /content é apagado)
+PASTA_PROJETO_DRIVE = "/content/drive/MyDrive/ProjetoRetinopatia"
+
+PASTA_SPLITS = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "splits"
+)
+
+# Zips das imagens já processadas, um por versão do pré-processamento
+PASTA_CACHE_DRIVE = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "cache"
 )
 
 # ============================================================
@@ -104,6 +122,30 @@ APLICAR_BEN = True
 
 SIGMA_BEN = 10
 
+# Como a máscara da retina é criada:
+# - "limiar_fixo" (v3): pixels acima de LIMIAR_MASCARA, maior região
+#   conexa e envoltória convexa. Funciona também em fotos escuras.
+# - "otsu" (v2): limiar de Otsu. Em fotos escuras separa "retina escura"
+#   de "retina menos escura" e pega só parte do círculo.
+METODO_MASCARA = "limiar_fixo"
+
+# Limiar, em tons de cinza de 0 a 255, que separa a retina do fundo preto
+LIMIAR_MASCARA = 10
+
+# Com True (v3), a média local da normalização de Ben é calculada só
+# dentro da retina e o resto vira COR_FUNDO. Com False (v2), o
+# desfoque mistura a retina com o preto do preenchimento e cria faixas
+# claras e escuras onde a câmera cortou o círculo (topo e base).
+BEN_RESPEITA_MASCARA = True
+
+# Erosão da máscara antes da normalização de Ben, em pixels da imagem
+# final: descarta a borda da retina, onde a iluminação é irregular
+EROSAO_MASCARA = 3
+
+# Fração mínima da área esperada da retina coberta pela máscara.
+# Abaixo disso a imagem é salva, mas marcada como "mascara_suspeita".
+FRACAO_MINIMA_MASCARA = 0.8
+
 # Fração do raio da retina mantida pela máscara circular. A borda do
 # círculo costuma ter artefatos de iluminação, por isso é descartada.
 RAIO_MASCARA = 0.9
@@ -117,12 +159,28 @@ RAIO_MINIMO = 10
 
 QUALIDADE_JPEG = 95
 
-VERSAO_PRE_PROCESSAMENTO = "v2"
+# v2: Otsu + Ben sem máscara. v3: máscara por limiar fixo + Ben só
+# dentro da retina (sem as faixas no topo e na base).
+VERSAO_PRE_PROCESSAMENTO = "v3"
 
 # Pasta desta versão do pré-processamento
 PASTA_IMAGENS_OTIMIZADAS = (
     f"/content/dataset_retina_{VERSAO_PRE_PROCESSAMENTO}_"
     f"{TAMANHO_IMAGEM[0]}"
+)
+
+# Zip da pasta acima no Drive. Se existir, a próxima sessão restaura
+# as imagens em ~2 minutos em vez de extrair o dataset bruto (~30 min)
+# e processá-lo de novo (~20 min).
+CAMINHO_ZIP_CACHE = os.path.join(
+    PASTA_CACHE_DRIVE,
+    os.path.basename(PASTA_IMAGENS_OTIMIZADAS) + ".zip"
+)
+
+# Lista das imagens com máscara suspeita desta versão
+CAMINHO_LISTA_SUSPEITAS = os.path.join(
+    PASTA_CACHE_DRIVE,
+    f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}.csv"
 )
 
 # Limita o número de threads para evitar sobrecarga
@@ -139,16 +197,21 @@ STATUS_DE_ERRO = [
     "erro_escrita"
 ]
 
+# Estado de uma imagem processada e salva, mas que merece inspeção
+STATUS_SUSPEITO = "mascara_suspeita"
+
 # ============================================================
 # PIPELINE DE DADOS
 # ============================================================
 
-# Valor inicial para EfficientNetB4 em 448 pixels numa GPU L4 com
-# precisão mista. Se houver erro de falta de memória (OOM), diminua
-# para 16; numa A100 dá para subir para 32.
-TAMANHO_LOTE = 24
+# Valor para EfficientNetB4 em 448 pixels numa GPU A100 com precisão
+# mista. Numa L4, ou se houver erro de falta de memória (OOM), use 24
+# ou 16.
+TAMANHO_LOTE = 32
 
-# Data augmentation aplicado somente ao conjunto de treino.
+# Data augmentation aplicado somente no treino. Roda dentro do modelo,
+# na GPU: no tf.data ele rodava na CPU e deixava a GPU ~85% do tempo
+# esperando (1,2 s por lote no treino contra 0,1 s no predict).
 # A retina não tem orientação canônica, então rotações de 360 graus
 # e espelhamentos são seguros.
 AUMENTO_DADOS = {
@@ -164,13 +227,21 @@ AUMENTO_DADOS = {
 
 FORMATO_ENTRADA = TAMANHO_IMAGEM + (3,)
 
-# Opções: "EfficientNetB3", "EfficientNetB4", "EfficientNetB5",
-# "EfficientNetV2S". Todas esperam a entrada na faixa de 0 a 255.
-BACKBONE = "EfficientNetB4"
+# Opções: "EfficientNetB0", "EfficientNetB3", "EfficientNetB4",
+# "EfficientNetB5", "EfficientNetV2S". Todas esperam a entrada na faixa de 0 a 255.
+#
+# Escolhido na primeira célula do notebook (variável de ambiente
+# RETINOPATIA_BACKBONE), para que o mesmo commit treine mais de um
+# backbone, cada um na sua pasta de resultados. Sem a variável, B4.
+BACKBONE = os.environ.get("RETINOPATIA_BACKBONE", "EfficientNetB4")
 
 # Precisão mista (float16 nos cálculos, float32 nos pesos): quase
 # dobra a velocidade em GPUs L4/A100/T4 e reduz o uso de memória.
 PRECISAO_MISTA = True
+
+# Compilação XLA do passo de treino ("auto" = o Keras decide). Se o fit
+# falhar ao compilar as camadas de data augmentation, use False.
+COMPILACAO_XLA = "auto"
 
 # Generalized Mean pooling (1º lugar APTOS 2019): p = 1 equivale à
 # média, p grande se aproxima do máximo. O p é aprendido no treino.
@@ -197,39 +268,114 @@ DELTA_HUBER = 1.0
 
 METRICA_MONITORADA = f"val_{SAIDA_DOENTE}_pr_auc"
 
-FATOR_REDUCE_LR = 0.2
+# ============================================================
+# RESULTADOS DO EXPERIMENTO (no Drive)
+# ============================================================
+
+
+def _commit_do_codigo():
+    """
+    Commit do git em que este código está (o notebook faz checkout de
+    uma revisão do GitHub). Fora de um repositório git, "sem_git".
+    """
+
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            check=True
+        ).stdout.strip()
+
+    except (OSError, subprocess.CalledProcessError):
+        return "sem_git"
+
+
+# Identifica a versão exata do código que gerou cada resultado: com ele,
+# `git checkout <commit>` recupera o código de qualquer treino antigo.
+COMMIT_CODIGO = _commit_do_codigo()
+
+# Cada combinação de backbone, tamanho, versões e commit ganha a sua
+# pasta, com pesos, histórico, predições, a configuração e uma cópia do
+# código. Um treino com código novo nunca sobrescreve um antigo.
+# Não faça git pull no meio de um experimento: o commit muda e, com o
+# autoreload, a pasta dos pesos também.
+NOME_EXPERIMENTO = (
+    f"{BACKBONE}_{TAMANHO_IMAGEM[0]}"
+    f"_pre{VERSAO_PRE_PROCESSAMENTO}"
+    f"_split{VERSAO_SPLIT}"
+    f"_seed{SEED}"
+    f"_{COMMIT_CODIGO}"
+)
+
+PASTA_RESULTADOS = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "resultados",
+    NOME_EXPERIMENTO
+)
+
+# Tabela com uma linha por treino concluído (commit, configuração
+# principal e métricas de validação e teste), para comparar todos os
+# experimentos num lugar só
+CAMINHO_REGISTRO_EXPERIMENTOS = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "resultados",
+    "registro_experimentos.csv"
+)
 
 # ============================================================
 # TREINO — FASE 1 (apenas as cabeças da rede)
 # ============================================================
 
-EPOCAS_FASE1 = 8
+# A Fase 1 só aquece as cabeças antes do fine-tuning. No treino v2, 7
+# épocas (2,7 h) levaram a PR-AUC de validação a 0,59, e a primeira
+# época da Fase 2 já a levou a 0,81.
+EPOCAS_FASE1 = 2
 
 TAXA_APRENDIZADO_FASE1 = 1e-3
 
-CAMINHO_PESOS_FASE1 = "melhor_modelo_retinopatia.weights.h5"
+CAMINHO_PESOS_FASE1 = os.path.join(
+    PASTA_RESULTADOS,
+    "melhor_modelo_fase1.weights.h5"
+)
 
-PACIENCIA_EARLY_STOP_FASE1 = 3
+CAMINHO_HISTORICO_FASE1 = os.path.join(
+    PASTA_RESULTADOS,
+    "historico_fase1.csv"
+)
 
-PACIENCIA_REDUCE_LR_FASE1 = 2
-
-LR_MINIMO_FASE1 = 1e-6
+PACIENCIA_EARLY_STOP_FASE1 = 2
 
 # ============================================================
 # TREINO — FASE 2 (fine-tuning)
 # ============================================================
 
-EPOCAS_FASE2 = 20
+# No treino v2 a PR-AUC de validação estabilizou na época 9; as épocas
+# seguintes não trouxeram ganho.
+EPOCAS_FASE2 = 12
 
+# Taxa máxima da Fase 2. Ela sobe linearmente durante o aquecimento e
+# depois cai em cosseno até FRACAO_LR_FINAL dela. No v2, o
+# ReduceLROnPlateau acompanhava val_loss e cortou a taxa em épocas em
+# que a PR-AUC ainda melhorava.
 TAXA_APRENDIZADO_FASE2 = 5e-5
 
-CAMINHO_PESOS_FASE2 = "melhor_modelo_retinopatia_fase2.weights.h5"
+EPOCAS_AQUECIMENTO_FASE2 = 1
 
-PACIENCIA_EARLY_STOP_FASE2 = 6
+FRACAO_LR_FINAL = 0.01
 
-PACIENCIA_REDUCE_LR_FASE2 = 2
+CAMINHO_PESOS_FASE2 = os.path.join(
+    PASTA_RESULTADOS,
+    "melhor_modelo_fase2.weights.h5"
+)
 
-LR_MINIMO_FASE2 = 1e-7
+CAMINHO_HISTORICO_FASE2 = os.path.join(
+    PASTA_RESULTADOS,
+    "historico_fase2.csv"
+)
+
+PACIENCIA_EARLY_STOP_FASE2 = 3
 
 # ============================================================
 # AVALIAÇÃO
@@ -247,4 +393,49 @@ TTA_ATIVO = True
 # MODELO FINAL
 # ============================================================
 
-CAMINHO_MODELO_FINAL = "modelo_retinopatia_final.keras"
+CAMINHO_MODELO_FINAL = os.path.join(
+    PASTA_RESULTADOS,
+    "modelo_retinopatia_final.keras"
+)
+
+# ============================================================
+# DIAGNÓSTICO
+# ============================================================
+
+# Reamostragens do bootstrap por paciente (intervalos de confiança)
+NUMERO_BOOTSTRAP = 1000
+
+# Grau mínimo da "retinopatia referenciável", reportada além do alvo
+# binário do modelo (grau 0 contra graus 1 a 4)
+GRAU_REFERENCIAVEL = 2
+
+# Formas de combinar os dois olhos de um paciente comparadas no
+# diagnóstico. "max" é a usada na avaliação.
+AGREGACOES_PACIENTE = ["max", "media", "max_media"]
+
+# Imagens mostradas na lista de falsos negativos
+NUMERO_IMAGENS_ERRO = 12
+
+# Modelo do treino v2 (EfficientNetB4 448, pré-processamento v2), para
+# o diagnóstico sem retreinar. Suba o arquivo para esta pasta do Drive.
+CAMINHO_MODELO_V2 = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "modelos",
+    "modelo_retinopatia_final.keras"
+)
+
+# Cache das imagens com o pré-processamento v2, recriado só para
+# validação e teste, para avaliar o modelo v2 nas imagens com que ele
+# foi treinado
+PASTA_IMAGENS_V2 = f"/content/dataset_retina_v2_{TAMANHO_IMAGEM[0]}"
+
+OPCOES_PRE_PROCESSAMENTO_V2 = {
+    "metodo_mascara": "otsu",
+    "ben_respeita_mascara": False
+}
+
+PASTA_DIAGNOSTICO_V2 = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "resultados",
+    "diagnostico_modelo_v2"
+)

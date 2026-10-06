@@ -2,28 +2,35 @@
 Treino do modelo em duas fases.
 
 Fase 1: a EfficientNet fica congelada e apenas as cabeças são treinadas,
-com uma taxa de aprendizado alta.
+com uma taxa de aprendizado alta, por poucas épocas (aquecimento).
 
 Fase 2 (fine-tuning): a rede base é descongelada, mas as camadas de
 BatchNormalization continuam congeladas — requisito conhecido ao fazer
 fine-tuning de EfficientNet — e o treino segue com uma taxa de
-aprendizado bem menor.
+aprendizado bem menor, que sobe durante um aquecimento e depois cai em
+cosseno.
 
 As duas fases usam callbacks com a mesma estrutura, criada por
-`criar_callbacks`, mudando apenas o arquivo de pesos e as paciências.
+`criar_callbacks`, mudando apenas os arquivos e a paciência. Pesos e
+histórico vão para a pasta do experimento no Drive, para sobreviverem
+a uma desconexão do Colab.
 
 O desbalanceamento entre as classes é compensado com pesos por amostra
 (`sample_weight`) acrescentados ao pipeline de treino: o argumento
 `class_weight` do Keras não funciona em modelos com mais de uma saída.
 """
 
+import os
+
 import numpy as np
+import psutil
 import tensorflow as tf
 from sklearn.utils import class_weight
 from tensorflow.keras.callbacks import (
+    Callback,
+    CSVLogger,
     EarlyStopping,
-    ModelCheckpoint,
-    ReduceLROnPlateau
+    ModelCheckpoint
 )
 
 from . import configuracao
@@ -119,21 +126,55 @@ def adicionar_pesos_amostra(treino_data, pesos_dicionario):
     ).prefetch(tf.data.AUTOTUNE)
 
 
+class MonitorRecursos(Callback):
+    """
+    Acrescenta ao log de cada época a taxa de aprendizado em uso, o pico
+    de memória da GPU e a RAM do sistema, em GB. Vai para o CSV do
+    histórico e mostra quanta folga há para aumentar o lote, a
+    resolução ou a rede.
+    """
+
+    def on_epoch_begin(self, epoca, logs=None):
+        for gpu in tf.config.list_logical_devices("GPU"):
+            tf.config.experimental.reset_memory_stats(gpu.name)
+
+    def on_epoch_end(self, epoca, logs=None):
+        if logs is None:
+            return
+
+        logs["taxa_aprendizado"] = float(
+            self.model.optimizer.learning_rate
+        )
+
+        gpus = tf.config.list_logical_devices("GPU")
+
+        for indice, gpu in enumerate(gpus):
+            pico = tf.config.experimental.get_memory_info(gpu.name)["peak"]
+            logs[f"memoria_gpu{indice}_pico_gb"] = pico / 1e9
+
+        logs["memoria_ram_gb"] = psutil.virtual_memory().used / 1e9
+
+
 def criar_callbacks(
     caminho_pesos,
+    caminho_historico,
     paciencia_early_stop,
-    paciencia_reduce_lr,
-    lr_minimo,
-    metrica=configuracao.METRICA_MONITORADA,
-    fator_reduce_lr=configuracao.FATOR_REDUCE_LR
+    metrica=configuracao.METRICA_MONITORADA
 ):
     """
     Cria os callbacks de monitorização do treino.
 
-    O checkpoint e o early stopping acompanham a métrica de validação
-    escolhida (PR-AUC por padrão); a redução de learning rate acompanha
-    o erro de validação.
+    O checkpoint e o early stopping acompanham a mesma métrica de
+    validação (PR-AUC por padrão), e o histórico de cada época é
+    gravado em CSV. A taxa de aprendizado não é ajustada por callback:
+    na Fase 2 ela segue um agendamento em cosseno.
     """
+
+    for caminho in (caminho_pesos, caminho_historico):
+        os.makedirs(
+            os.path.dirname(caminho),
+            exist_ok=True
+        )
 
     checkpoint = ModelCheckpoint(
         caminho_pesos,
@@ -152,19 +193,14 @@ def criar_callbacks(
         verbose=1
     )
 
-    reduce_lr = ReduceLROnPlateau(
-        monitor="val_loss",
-        mode="min",
-        factor=fator_reduce_lr,
-        patience=paciencia_reduce_lr,
-        min_lr=lr_minimo,
-        verbose=1
-    )
+    historico = CSVLogger(caminho_historico)
 
+    # Antes do CSVLogger, para que os valores entrem no CSV
     return [
+        MonitorRecursos(),
         checkpoint,
         early_stop,
-        reduce_lr
+        historico
     ]
 
 
@@ -175,23 +211,55 @@ def criar_callbacks_fase1():
 
     return criar_callbacks(
         caminho_pesos=configuracao.CAMINHO_PESOS_FASE1,
-        paciencia_early_stop=configuracao.PACIENCIA_EARLY_STOP_FASE1,
-        paciencia_reduce_lr=configuracao.PACIENCIA_REDUCE_LR_FASE1,
-        lr_minimo=configuracao.LR_MINIMO_FASE1
+        caminho_historico=configuracao.CAMINHO_HISTORICO_FASE1,
+        paciencia_early_stop=configuracao.PACIENCIA_EARLY_STOP_FASE1
     )
 
 
 def criar_callbacks_fase2():
     """
-    Callbacks da Fase 2, com paciências maiores e learning rate mínimo
-    menor que os da Fase 1.
+    Callbacks da Fase 2, com os valores definidos em `configuracao`.
     """
 
     return criar_callbacks(
         caminho_pesos=configuracao.CAMINHO_PESOS_FASE2,
-        paciencia_early_stop=configuracao.PACIENCIA_EARLY_STOP_FASE2,
-        paciencia_reduce_lr=configuracao.PACIENCIA_REDUCE_LR_FASE2,
-        lr_minimo=configuracao.LR_MINIMO_FASE2
+        caminho_historico=configuracao.CAMINHO_HISTORICO_FASE2,
+        paciencia_early_stop=configuracao.PACIENCIA_EARLY_STOP_FASE2
+    )
+
+
+def criar_taxa_cosseno(
+    treino_data,
+    epocas,
+    taxa_maxima,
+    epocas_aquecimento=configuracao.EPOCAS_AQUECIMENTO_FASE2,
+    fracao_final=configuracao.FRACAO_LR_FINAL
+):
+    """
+    Agendamento da taxa de aprendizado: sobe linearmente de quase zero
+    até `taxa_maxima` nas épocas de aquecimento e depois cai em cosseno
+    até `fracao_final * taxa_maxima` na última época.
+
+    O aquecimento evita que os primeiros gradientes da rede recém-
+    descongelada destruam os pesos da ImageNet.
+    """
+
+    passos_por_epoca = int(treino_data.cardinality())
+
+    if passos_por_epoca <= 0:
+        raise ValueError(
+            "Não foi possível saber o número de lotes por época do "
+            "pipeline de treino."
+        )
+
+    passos_aquecimento = passos_por_epoca * epocas_aquecimento
+
+    return tf.keras.optimizers.schedules.CosineDecay(
+        initial_learning_rate=taxa_maxima * fracao_final,
+        decay_steps=passos_por_epoca * epocas - passos_aquecimento,
+        alpha=fracao_final,
+        warmup_target=taxa_maxima,
+        warmup_steps=passos_aquecimento
     )
 
 
@@ -245,7 +313,8 @@ def fine_tuning_fase2(
     """
     Executa o fine-tuning: recupera os pesos da Fase 1, descongela a
     rede base mantendo a BatchNormalization congelada, recompila com uma
-    taxa de aprendizado menor e treina novamente.
+    taxa de aprendizado menor (cosseno com aquecimento) e treina
+    novamente.
 
     Retorna o histórico do treino da Fase 2.
     """
@@ -268,7 +337,10 @@ def fine_tuning_fase2(
             layer.trainable = False
 
     # Recompila obrigatoriamente depois de alterar trainable
-    compilar_modelo(modelo, taxa_aprendizado)
+    compilar_modelo(
+        modelo,
+        criar_taxa_cosseno(treino_data, epocas, taxa_aprendizado)
+    )
 
     print("Iniciando o treinamento da Fase 2...")
 

@@ -2,9 +2,13 @@
 Pipelines de dados com tf.data.
 
 As imagens já vêm pré-processadas do disco (ver `pre_processamento`),
-então o pipeline só lê o JPEG, aplica data augmentation no treino e
-monta os lotes. Os bytes dos arquivos ficam em cache na memória depois
-da primeira época; a decodificação e o augmentation rodam em paralelo.
+então o pipeline só lê o JPEG, embaralha o treino e monta os lotes. Os
+bytes dos arquivos ficam em cache na memória depois da primeira época.
+
+O data augmentation é definido aqui (`criar_aumento_dados`), mas roda
+dentro do modelo, na GPU (ver `modelo.construir_modelo`). No tf.data
+ele rodava na CPU e era o gargalo do treino: 1,2 s por lote no treino
+contra 0,1 s por lote no predict, com a mesma rede.
 
 Cada lote traz os rótulos das duas saídas do modelo:
     x, {"doente": classe binária, "grau": grau original 0 a 4}
@@ -18,6 +22,7 @@ imagens na faixa de 0 a 255 e faz a normalização internamente.
 """
 
 import os
+import time
 
 import tensorflow as tf
 from tensorflow.keras import layers
@@ -33,11 +38,13 @@ def criar_aumento_dados(
     seed=configuracao.SEED
 ):
     """
-    Cria a função de data augmentation aplicada aos lotes de treino.
+    Cria o bloco de data augmentation, colocado logo depois da entrada
+    do modelo. As camadas aleatórias só agem no treino (`training=True`);
+    no predict, na avaliação e na TTA a imagem passa intacta.
 
     As camadas são criadas em float32 de propósito: com a precisão
-    mista ativa, elas devolveriam float16, e o augmentation roda no
-    pipeline de dados, não no modelo.
+    mista ativa, elas devolveriam float16, e a entrada da EfficientNet
+    deve continuar na faixa de 0 a 255 com precisão total.
     """
 
     camadas = [
@@ -73,13 +80,10 @@ def criar_aumento_dados(
         )
     ]
 
-    def aumentar(lote):
-        for camada in camadas:
-            lote = camada(lote, training=True)
-
-        return lote
-
-    return aumentar
+    return tf.keras.Sequential(
+        camadas,
+        name="aumento_dados"
+    )
 
 
 def _rotulos(df):
@@ -114,8 +118,9 @@ def criar_dataset(
     """
     Cria o tf.data.Dataset de um conjunto.
 
-    Com `treino=True`, embaralha a cada época e aplica data
-    augmentation. Com `treino=False`, mantém a ordem do DataFrame.
+    Com `treino=True`, embaralha a cada época. Com `treino=False`,
+    mantém a ordem do DataFrame. O data augmentation não fica aqui: ele
+    roda dentro do modelo.
     """
 
     caminhos = [
@@ -156,14 +161,6 @@ def criar_dataset(
         num_parallel_calls=AUTOTUNE
     ).batch(tamanho_lote)
 
-    if treino:
-        aumento = criar_aumento_dados(seed=seed)
-
-        dataset = dataset.map(
-            lambda x, rotulos: (aumento(x), rotulos),
-            num_parallel_calls=AUTOTUNE
-        )
-
     return dataset.prefetch(AUTOTUNE)
 
 
@@ -177,8 +174,8 @@ def criar_geradores(
     seed=configuracao.SEED
 ):
     """
-    Cria os pipelines de treino (com data augmentation), validação e
-    teste (sem augmentation e sem embaralhar).
+    Cria os pipelines de treino (embaralhado), validação e teste (sem
+    embaralhar).
 
     Retorna:
         (treino_data, val_data, teste_data)
@@ -240,3 +237,32 @@ def verificar_escala(treino_data, val_data):
     )
 
     print("Escala das imagens verificada com sucesso!")
+
+
+def medir_velocidade(dataset, passos=50):
+    """
+    Mede quantos lotes por segundo o pipeline entrega sozinho, sem o
+    modelo. Se o pipeline levar mais por lote do que o passo de treino
+    na GPU, a GPU fica esperando os dados.
+
+    O primeiro lote é descartado da medição (inclui a montagem do
+    pipeline). Na primeira época os bytes ainda estão sendo lidos do
+    disco; nas seguintes vêm do cache em memória.
+    """
+
+    iterador = iter(dataset)
+    next(iterador)
+
+    inicio = time.perf_counter()
+
+    for _ in range(passos):
+        lote = next(iterador)
+
+    duracao = time.perf_counter() - inicio
+
+    tamanho_lote = lote[0].shape[0]
+
+    print(
+        f"\nPipeline: {duracao / passos:.3f} s por lote | "
+        f"{passos * tamanho_lote / duracao:.0f} imagens por segundo"
+    )

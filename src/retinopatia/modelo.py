@@ -1,8 +1,10 @@
 """
 Arquitetura do modelo: transfer learning com EfficientNet.
 
-A EfficientNet pré-treinada na ImageNet entra como extratora de
-características, seguida de GeM pooling e de duas cabeças:
+A entrada passa primeiro pelo bloco de data augmentation (ativo só no
+treino, rodando na GPU). Depois, a EfficientNet pré-treinada na
+ImageNet entra como extratora de características, seguida de GeM
+pooling e de duas cabeças:
 
 - `doente`: sigmoide com entropia cruzada binária. É a decisão do
   modelo (sem retinopatia x com retinopatia).
@@ -20,8 +22,10 @@ import tensorflow as tf
 from tensorflow.keras import applications, layers, models
 
 from . import configuracao
+from .pipeline_dados import criar_aumento_dados
 
 BACKBONES = {
+    "EfficientNetB0": applications.EfficientNetB0,
     "EfficientNetB3": applications.EfficientNetB3,
     "EfficientNetB4": applications.EfficientNetB4,
     "EfficientNetB5": applications.EfficientNetB5,
@@ -109,13 +113,16 @@ def compilar_modelo(
     modelo,
     taxa_aprendizado,
     peso_perda_grau=configuracao.PESO_PERDA_GRAU,
-    delta_huber=configuracao.DELTA_HUBER
+    delta_huber=configuracao.DELTA_HUBER,
+    compilacao_xla=configuracao.COMPILACAO_XLA
 ):
     """
     Compila o modelo com as perdas e métricas das duas saídas.
 
     Usada na construção (Fase 1) e de novo no fine-tuning (Fase 2),
-    que precisa recompilar depois de alterar `trainable`.
+    que precisa recompilar depois de alterar `trainable`. A
+    `taxa_aprendizado` pode ser um número ou um agendamento do Keras
+    (a Fase 2 usa cosseno com aquecimento).
     """
 
     modelo.compile(
@@ -137,7 +144,8 @@ def compilar_modelo(
             configuracao.SAIDA_GRAU: [
                 tf.keras.metrics.MeanAbsoluteError(name="mae")
             ]
-        }
+        },
+        jit_compile=compilacao_xla
     )
 
 
@@ -180,9 +188,12 @@ def construir_modelo(
         name="imagem"
     )
 
+    # Ativo só no treino; no predict a imagem passa intacta
+    x = criar_aumento_dados()(entrada)
+
     # training=False mantém a BatchNormalization da rede base em modo
     # de inferência mesmo depois do descongelamento no fine-tuning
-    x = modelo_base(entrada, training=False)
+    x = modelo_base(x, training=False)
 
     x = GeM(name="gem")(x)
 

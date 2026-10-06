@@ -20,7 +20,13 @@ desempenho combinando os dois olhos.
 
 Uma única função, `avaliar_modelo`, serve às duas fases de treino: o
 parâmetro `nome_fase` apenas diferencia os títulos e as mensagens.
+
+As predições de cada imagem (probabilidade e grau previsto) são
+salvas em CSV na pasta de resultados, para que o diagnóstico possa ser
+refeito sem rodar o modelo de novo.
 """
+
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -123,18 +129,23 @@ def _variantes_tta(tta):
     ]
 
 
-def prever_probabilidades(
+def prever_saidas(
     modelo,
     dados,
     tta=configuracao.TTA_ATIVO
 ):
     """
-    Gera a probabilidade de retinopatia de cada imagem, na ordem do
-    pipeline (que não embaralha). Com TTA, devolve a média das
-    predições da imagem original e de seus espelhamentos.
+    Gera, para cada imagem e na ordem do pipeline (que não embaralha),
+    a probabilidade de retinopatia e o grau previsto pela cabeça
+    auxiliar. Com TTA, devolve a média das predições da imagem original
+    e de seus espelhamentos.
+
+    Retorna:
+        (probabilidades, graus_previstos)
     """
 
-    predicoes = []
+    probabilidades = []
+    graus = []
 
     for transformar in _variantes_tta(tta):
         # O pipeline devolve (imagens, rótulos); só as imagens interessam
@@ -144,19 +155,44 @@ def prever_probabilidades(
 
         saida = modelo.predict(imagens, verbose=1)
 
-        if isinstance(saida, dict):
-            saida = saida[configuracao.SAIDA_DOENTE]
+        # Um modelo carregado do disco pode devolver lista em vez de
+        # dicionário; os nomes das saídas dizem a ordem
+        if not isinstance(saida, dict):
+            saida = dict(zip(modelo.output_names, saida))
 
-        predicoes.append(np.asarray(saida).ravel())
+        probabilidades.append(
+            np.asarray(saida[configuracao.SAIDA_DOENTE]).ravel()
+        )
+        graus.append(
+            np.asarray(saida[configuracao.SAIDA_GRAU]).ravel()
+        )
 
-    return np.mean(predicoes, axis=0)
+    return np.mean(probabilidades, axis=0), np.mean(graus, axis=0)
 
 
-def agregar_por_paciente(df, probabilidades):
+def _agregar(valores, funcao):
+    """
+    Combina os valores dos olhos de um paciente:
+    "max" (o maior), "media" ou "max_media" (média dos dois anteriores).
+    """
+
+    if funcao == "max":
+        return valores.max()
+
+    if funcao == "media":
+        return valores.mean()
+
+    if funcao == "max_media":
+        return (valores.max() + valores.mean()) / 2
+
+    raise ValueError(f"Agregação desconhecida: {funcao}")
+
+
+def agregar_por_paciente(df, probabilidades, funcao="max"):
     """
     Combina os dois olhos de cada paciente: a classe do paciente é 1 se
-    qualquer olho estiver doente, e a probabilidade é a maior entre as
-    dos dois olhos.
+    qualquer olho estiver doente, e a probabilidade é, por padrão, a
+    maior entre as dos dois olhos (ver `_agregar` para as alternativas).
 
     Retorna:
         (classes_paciente, probabilidades_paciente)
@@ -168,12 +204,57 @@ def agregar_por_paciente(df, probabilidades):
         "probabilidade": probabilidades
     })
 
-    por_paciente = por_olho.groupby("patient_id").max()
+    por_paciente = por_olho.groupby("patient_id").agg(
+        target=("target", "max"),
+        probabilidade=(
+            "probabilidade",
+            lambda valores: _agregar(valores, funcao)
+        )
+    )
 
     return (
         por_paciente["target"].values,
         por_paciente["probabilidade"].values
     )
+
+
+def salvar_predicoes(
+    df,
+    probabilidades,
+    graus_previstos,
+    nome,
+    pasta_resultados=configuracao.PASTA_RESULTADOS
+):
+    """
+    Salva a tabela de predições por imagem em
+    `pasta_resultados/predicoes_<nome>.csv` e a devolve.
+
+    Colunas: image, patient_id, level_original, target,
+    prob_doente, grau_previsto.
+    """
+
+    tabela = df[
+        ["image", "patient_id", "level_original", "target"]
+    ].copy()
+
+    tabela["prob_doente"] = probabilidades
+    tabela["grau_previsto"] = graus_previstos
+
+    os.makedirs(
+        pasta_resultados,
+        exist_ok=True
+    )
+
+    caminho = os.path.join(
+        pasta_resultados,
+        f"predicoes_{nome}.csv"
+    )
+
+    tabela.to_csv(caminho, index=False)
+
+    print(f"\nPredições salvas em: {caminho}")
+
+    return tabela
 
 
 def escolher_limiar(
@@ -350,31 +431,51 @@ def _escolher_e_informar_limiar(
     return limiar
 
 
+def _nome_arquivo(texto):
+    """
+    Converte um título (por exemplo, "Fase 2") em parte de nome de
+    arquivo ("fase_2").
+    """
+
+    return texto.lower().replace(" ", "_")
+
+
 def avaliar_modelo(
     modelo,
     val_data,
     df_val,
     historico,
     nome_fase,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA,
+    pasta_resultados=configuracao.PASTA_RESULTADOS
 ):
     """
     Executa a avaliação completa de uma fase de treino na validação:
-    gráficos do histórico, escolha dos limiares (por olho e por
-    paciente), matrizes de confusão e relatórios.
+    gráficos do histórico (se `historico` não for None), escolha dos
+    limiares (por olho e por paciente), matrizes de confusão e
+    relatórios. As predições são salvas em CSV em `pasta_resultados`.
 
     Retorna um dicionário com os limiares escolhidos, as métricas e as
-    predições da validação. Os limiares são reutilizados por
-    `avaliar_no_teste`.
+    predições da validação (vetor e tabela por imagem). Os limiares são
+    reutilizados por `avaliar_no_teste`.
     """
 
     # 1. GRÁFICOS DO TREINAMENTO
-    plotar_historico(historico, nome_fase)
+    if historico is not None:
+        plotar_historico(historico, nome_fase)
 
     # 2. PROBABILIDADES NA VALIDAÇÃO
     print("\nGerando probabilidades na validação...")
 
-    predicoes = prever_probabilidades(modelo, val_data)
+    predicoes, graus_previstos = prever_saidas(modelo, val_data)
+
+    tabela = salvar_predicoes(
+        df_val,
+        predicoes,
+        graus_previstos,
+        f"validacao_{_nome_arquivo(nome_fase)}",
+        pasta_resultados
+    )
 
     classes_olho = df_val["target"].astype(int).values
 
@@ -424,7 +525,8 @@ def avaliar_modelo(
         "limiar_paciente": limiar_paciente,
         "metricas_olho": metricas_olho,
         "metricas_paciente": metricas_paciente,
-        "predicoes": predicoes
+        "predicoes": predicoes,
+        "tabela": tabela
     }
 
 
@@ -433,20 +535,30 @@ def avaliar_no_teste(
     teste_data,
     df_teste,
     resultado_validacao,
-    nome="Teste"
+    nome="Teste",
+    pasta_resultados=configuracao.PASTA_RESULTADOS
 ):
     """
     Avalia o modelo no conjunto de teste usando os limiares escolhidos
     na validação (o resultado de `avaliar_modelo`). É a estimativa
-    honesta do desempenho do modelo.
+    honesta do desempenho do modelo. As predições são salvas em CSV em
+    `pasta_resultados`.
 
     Retorna um dicionário com as métricas por olho e por paciente e as
-    predições do teste.
+    predições do teste (vetor e tabela por imagem).
     """
 
     print("\nGerando probabilidades no teste...")
 
-    predicoes = prever_probabilidades(modelo, teste_data)
+    predicoes, graus_previstos = prever_saidas(modelo, teste_data)
+
+    tabela = salvar_predicoes(
+        df_teste,
+        predicoes,
+        graus_previstos,
+        _nome_arquivo(nome),
+        pasta_resultados
+    )
 
     classes_paciente, predicoes_paciente = agregar_por_paciente(
         df_teste,
@@ -470,5 +582,65 @@ def avaliar_no_teste(
     return {
         "metricas_olho": metricas_olho,
         "metricas_paciente": metricas_paciente,
-        "predicoes": predicoes
+        "predicoes": predicoes,
+        "tabela": tabela
     }
+
+
+def registrar_experimento(
+    resultado_validacao,
+    resultado_teste,
+    caminho_registro=configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
+):
+    """
+    Acrescenta uma linha ao registro de experimentos no Drive: commit
+    do código, configuração principal, limiares e as métricas de
+    validação e de teste por olho e por paciente.
+
+    Para escolher entre experimentos, compare as colunas de validação;
+    as de teste só valem para o modelo final escolhido.
+    """
+
+    linha = {
+        "data": pd.Timestamp.now().isoformat(timespec="seconds"),
+        "experimento": configuracao.NOME_EXPERIMENTO,
+        "commit": configuracao.COMMIT_CODIGO,
+        "backbone": configuracao.BACKBONE,
+        "tamanho_imagem": configuracao.TAMANHO_IMAGEM[0],
+        "pre_processamento": configuracao.VERSAO_PRE_PROCESSAMENTO,
+        "tamanho_lote": configuracao.TAMANHO_LOTE,
+        "limiar_olho": resultado_validacao["limiar_olho"],
+        "limiar_paciente": resultado_validacao["limiar_paciente"]
+    }
+
+    for conjunto, resultado in (
+        ("val", resultado_validacao),
+        ("teste", resultado_teste)
+    ):
+        for nivel in ("olho", "paciente"):
+            metricas = resultado[f"metricas_{nivel}"]
+
+            for nome in ("roc_auc", "pr_auc", "sensibilidade", "especificidade"):
+                linha[f"{conjunto}_{nivel}_{nome}"] = round(
+                    float(metricas[nome]),
+                    4
+                )
+
+    os.makedirs(
+        os.path.dirname(caminho_registro),
+        exist_ok=True
+    )
+
+    registro = pd.DataFrame([linha])
+
+    if os.path.isfile(caminho_registro):
+        registro = pd.concat(
+            [pd.read_csv(caminho_registro), registro],
+            ignore_index=True
+        )
+
+    registro.to_csv(caminho_registro, index=False)
+
+    print(f"Experimento registrado em: {caminho_registro}")
+
+    return registro

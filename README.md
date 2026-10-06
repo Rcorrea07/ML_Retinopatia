@@ -51,39 +51,51 @@ serve apenas como documentação das bibliotecas usadas no Colab.
     ├── pipeline_dados.py       # pipelines tf.data e data augmentation
     ├── modelo.py               # EfficientNet + GeM + cabeças binária e de grau
     ├── treinamento.py          # pesos de classe, callbacks e as duas fases
-    └── avaliacao.py            # curvas, limiar, TTA, avaliação por olho e paciente
+    ├── avaliacao.py            # curvas, limiar, TTA, avaliação por olho e paciente
+    └── diagnostico.py          # erros por grau, grau ≥ 2, agregação e bootstrap
 ```
 
 ## Pipeline
 
 1. **Extração do dataset** — descompacta o zip do Drive no disco local do Colab
-   (pula a etapa se os dados já estiverem lá).
+   (pula a etapa se os dados já estiverem lá). Se o zip das imagens já
+   processadas desta versão existir em `ProjetoRetinopatia/cache/`, ele é
+   restaurado e só o CSV de rótulos é extraído.
 2. **Rótulos e divisão** — valida os nomes das imagens, cria a classe binária e
    divide em **treino, validação e teste** com `StratifiedGroupKFold` agrupado por
    paciente (10 dobras: uma para teste, uma para validação, oito para treino), para
    que os dois olhos da mesma pessoa nunca caiam em conjuntos diferentes. Os splits
    são salvos no Drive, versionados pelo esquema e pela semente, e reutilizados nas
    execuções seguintes.
-3. **Pré-processamento offline** — feito uma única vez e gravado em cache:
-   máscara de Otsu, recorte quadrado centrado na retina (toda retina ocupa a mesma
-   área da imagem), redimensionamento para 448×448, normalização de cor de Ben
-   Graham e máscara circular a 90% do raio.
-4. **Pipelines `tf.data`** — data augmentation no treino (rotação de 360°,
-   espelhamentos, zoom, brilho e contraste); validação e teste limpos e sem
-   embaralhamento. Nenhum aplica rescale: a EfficientNet espera imagens de 0 a 255.
-5. **Modelo** — EfficientNetB4 + GeM pooling + duas saídas: `doente` (sigmoide, a
-   decisão) e `grau` (regressão do grau 0 a 4 com perda de Huber, auxiliar).
-   Precisão mista para acelerar o treino. O desbalanceamento é compensado com pesos
-   por amostra.
-6. **Treino em duas fases** — Fase 1 com a rede base congelada (`lr=1e-3`) e Fase 2
-   de fine-tuning com a base descongelada, mantendo as camadas de BatchNormalization
-   congeladas (`lr=5e-5`).
+3. **Pré-processamento offline (v3)** — feito uma única vez e gravado em cache
+   (no disco do Colab e em zip no Drive): máscara da retina por limiar fixo,
+   recorte quadrado centrado na retina (toda retina ocupa a mesma área da
+   imagem), redimensionamento para 448×448, normalização de cor de Ben Graham
+   calculada só dentro da retina e máscara circular a 90% do raio. Imagens cuja
+   máscara cobre pouco da retina são marcadas como suspeitas.
+4. **Pipelines `tf.data`** — só leitura, embaralhamento do treino e lotes;
+   validação e teste sem embaralhamento. Nenhum aplica rescale: a EfficientNet
+   espera imagens de 0 a 255.
+5. **Modelo** — bloco de data augmentation na GPU (rotação de 360°,
+   espelhamentos, zoom, brilho e contraste; só age no treino) + EfficientNetB4 +
+   GeM pooling + duas saídas: `doente` (sigmoide, a decisão) e `grau` (regressão
+   do grau 0 a 4 com perda de Huber, auxiliar). Precisão mista para acelerar o
+   treino. O desbalanceamento é compensado com pesos por amostra.
+6. **Treino em duas fases** — Fase 1 curta, só para aquecer as cabeças com a
+   rede base congelada (`lr=1e-3`), e Fase 2 de fine-tuning com a base
+   descongelada, mantendo as camadas de BatchNormalization congeladas, com taxa
+   de aprendizado em cosseno com aquecimento (máximo `5e-5`). Pesos, histórico,
+   predições e a configuração usada ficam em
+   `ProjetoRetinopatia/resultados/<experimento>/` no Drive.
 7. **Avaliação** — predições com test-time augmentation (espelhamentos). O limiar de
    decisão não é 0.5: ele é escolhido **na validação**, na curva ROC, como o ponto que
    atinge pelo menos **90% de sensibilidade** com o menor número de falsos positivos,
    e então aplicado ao **teste**, que dá a estimativa honesta. As métricas são
    reportadas por olho e por paciente (probabilidade do paciente = maior entre os dois
    olhos, como na regra clínica de encaminhamento).
+8. **Diagnóstico** — sensibilidade por grau original, desempenho para retinopatia
+   referenciável (grau ≥ 2), utilidade da cabeça de grau, formas de combinar os
+   olhos e intervalos de confiança por bootstrap de pacientes.
 
 ## Origem das escolhas
 
@@ -112,7 +124,7 @@ Para carregar o modelo salvo, informe a camada personalizada:
 ```python
 from retinopatia.modelo import GeM
 modelo = tf.keras.models.load_model(
-    "modelo_retinopatia_final.keras",
+    configuracao.CAMINHO_MODELO_FINAL,
     custom_objects={"GeM": GeM}
 )
 ```
