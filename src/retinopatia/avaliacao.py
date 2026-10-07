@@ -604,6 +604,7 @@ def registrar_experimento(
     linha = {
         "data": pd.Timestamp.now().isoformat(timespec="seconds"),
         "experimento": configuracao.NOME_EXPERIMENTO,
+        "modelo": configuracao.NOME_MODELO,
         "commit": configuracao.COMMIT_CODIGO,
         "backbone": configuracao.BACKBONE,
         "tamanho_imagem": configuracao.TAMANHO_IMAGEM[0],

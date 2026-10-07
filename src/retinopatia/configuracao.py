@@ -52,17 +52,36 @@ CAMINHO_CSV = os.path.join(
 )
 
 # Pasta do projeto no Drive: tudo o que precisa sobreviver a uma
-# desconexão do Colab fica aqui (o disco /content é apagado)
+# desconexão do Colab fica aqui (o disco /content é apagado).
+# Organização:
+#   modelos/          modelos finais (.keras), um por treino
+#   resultados/       uma pasta por treino (pesos, históricos, predições,
+#                     configuração) e o registro de todos os treinos
+#   relatorios/       relatórios em PDF
+#   notebooks/        cópias dos notebooks executados, com as saídas
+#   dados_internos/   arquivos de trabalho do pipeline (splits e cache)
 PASTA_PROJETO_DRIVE = "/content/drive/MyDrive/ProjetoRetinopatia"
 
-PASTA_SPLITS = os.path.join(
+PASTA_MODELOS = os.path.join(
     PASTA_PROJETO_DRIVE,
+    "modelos"
+)
+
+PASTA_DADOS_INTERNOS = os.path.join(
+    PASTA_PROJETO_DRIVE,
+    "dados_internos"
+)
+
+# Divisão treino/validação/teste salva uma vez e reutilizada: garante
+# que todos os treinos sejam comparados nos mesmos pacientes
+PASTA_SPLITS = os.path.join(
+    PASTA_DADOS_INTERNOS,
     "splits"
 )
 
 # Zips das imagens já processadas, um por versão do pré-processamento
 PASTA_CACHE_DRIVE = os.path.join(
-    PASTA_PROJETO_DRIVE,
+    PASTA_DADOS_INTERNOS,
     "cache"
 )
 
@@ -399,9 +418,18 @@ TTA_ATIVO = True
 # MODELO FINAL
 # ============================================================
 
+# Nome legível do modelo: rede, tamanho, versão do pré-processamento e
+# commit do código, por exemplo "B4_448_v3_1ccd2cb"
+NOME_MODELO = (
+    f"{BACKBONE.replace('EfficientNet', '')}"
+    f"_{TAMANHO_IMAGEM[0]}"
+    f"_{VERSAO_PRE_PROCESSAMENTO}"
+    f"_{COMMIT_CODIGO}"
+)
+
 CAMINHO_MODELO_FINAL = os.path.join(
-    PASTA_RESULTADOS,
-    "modelo_retinopatia_final.keras"
+    PASTA_MODELOS,
+    NOME_MODELO + ".keras"
 )
 
 # ============================================================
@@ -423,11 +451,10 @@ AGREGACOES_PACIENTE = ["max", "media", "max_media"]
 NUMERO_IMAGENS_ERRO = 12
 
 # Modelo do treino v2 (EfficientNetB4 448, pré-processamento v2), para
-# o diagnóstico sem retreinar. Suba o arquivo para esta pasta do Drive.
+# o diagnóstico sem retreinar (treino de ~10 h, código da tag treino-v2).
 CAMINHO_MODELO_V2 = os.path.join(
-    PASTA_PROJETO_DRIVE,
-    "modelos",
-    "modelo_retinopatia_final.keras"
+    PASTA_MODELOS,
+    "B4_448_v2_de5cc37.keras"
 )
 
 # Cache das imagens com o pré-processamento v2, recriado só para

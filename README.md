@@ -55,11 +55,25 @@ serve apenas como documentação das bibliotecas usadas no Colab.
     └── diagnostico.py          # erros por grau, grau ≥ 2, agregação e bootstrap
 ```
 
+## Organização no Google Drive
+
+```
+MyDrive/ProjetoRetinopatia/
+├── modelos/          # modelos finais (.keras), ex.: B4_448_v3_1ccd2cb.keras
+├── resultados/       # uma pasta por treino + registro_experimentos.csv
+├── relatorios/       # relatórios em PDF
+├── notebooks/        # cópias dos notebooks executados, com as saídas
+└── dados_internos/   # splits (mesma divisão para todos os treinos) e cache das imagens
+```
+
+O nome do modelo junta rede, tamanho da imagem, versão do pré-processamento e
+commit do código. O commit permite recuperar o código exato de cada treino.
+
 ## Pipeline
 
 1. **Extração do dataset** — descompacta o zip do Drive no disco local do Colab
    (pula a etapa se os dados já estiverem lá). Se o zip das imagens já
-   processadas desta versão existir em `ProjetoRetinopatia/cache/`, ele é
+   processadas desta versão existir em `ProjetoRetinopatia/dados_internos/cache/`, ele é
    restaurado e só o CSV de rótulos é extraído.
 2. **Rótulos e divisão** — valida os nomes das imagens, cria a classe binária e
    divide em **treino, validação e teste** com `StratifiedGroupKFold` agrupado por

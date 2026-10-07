@@ -11,3 +11,6 @@ __pycache__/
 
 # Sistema
 .DS_Store
+
+# Relatórios, modelos baixados e anotações locais (não versionados)
+relatorios/
