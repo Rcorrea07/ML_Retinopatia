@@ -632,21 +632,9 @@ def pre_processar_dataset(
         .value_counts()
     )
 
-    falhas = resultados_df[
-        resultados_df["status"].isin(configuracao.STATUS_DE_ERRO)
-    ]
-
-    # Interrompe a execução caso alguma imagem tenha falhado
-    if not falhas.empty:
-        print("\nExemplos de imagens que apresentaram problemas:")
-        print(
-            falhas.head(20).to_string(index=False)
-        )
-
-        raise RuntimeError(
-            f"{len(falhas)} imagens falharam no pré-processamento."
-        )
-
+    # A lista das suspeitas é salva antes da checagem de falhas: numa
+    # nova execução as imagens já salvas viram "existente" e a lista
+    # não poderia mais ser refeita
     suspeitas = resultados_df[
         resultados_df["status"] == configuracao.STATUS_SUSPEITO
     ]
@@ -667,6 +655,21 @@ def pre_processar_dataset(
             suspeitas.to_csv(caminho_lista_suspeitas, index=False)
 
             print(f"Lista salva em: {caminho_lista_suspeitas}")
+
+    falhas = resultados_df[
+        resultados_df["status"].isin(configuracao.STATUS_DE_ERRO)
+    ]
+
+    # Interrompe a execução caso alguma imagem tenha falhado
+    if not falhas.empty:
+        print("\nExemplos de imagens que apresentaram problemas:")
+        print(
+            falhas.head(20).to_string(index=False)
+        )
+
+        raise RuntimeError(
+            f"{len(falhas)} imagens falharam no pré-processamento."
+        )
 
     # Confirma se todas as imagens esperadas existem na pasta final
     imagens_ausentes = [
