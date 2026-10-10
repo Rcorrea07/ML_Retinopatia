@@ -14,6 +14,7 @@ usado no fim, para medir o desempenho sem viés de seleção.
 """
 
 import os
+import urllib.request
 
 import numpy as np
 import pandas as pd
@@ -433,3 +434,90 @@ def preparar_dataset(
     )
 
     return dados, df_treino, df_val, df_teste
+
+
+def carregar_dados_extra(
+    dados,
+    caminho_rotulos=configuracao.CAMINHO_ROTULOS_EXTRA,
+    url_rotulos=configuracao.URL_ROTULOS_EXTRA,
+    pasta_processada=configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA
+):
+    """
+    Carrega os rótulos das 53.576 imagens do "test" da competição de
+    2015, que entram só no treino.
+
+    O CSV (colunas image, level, Usage) é baixado uma vez da URL
+    publicada pelos organizadores e guardado no Drive. Os pacientes do
+    test são outras pessoas: a função confere que nenhum deles aparece
+    em `dados` (o train, de onde saem a validação e o teste do projeto).
+
+    Retorna o DataFrame no mesmo formato do treino, com a coluna
+    `pasta_processada` apontando para a pasta das imagens extras.
+    """
+
+    if not os.path.isfile(caminho_rotulos):
+        print(f"Baixando os rótulos do test de 2015 de {url_rotulos}...")
+
+        os.makedirs(
+            os.path.dirname(caminho_rotulos),
+            exist_ok=True
+        )
+
+        urllib.request.urlretrieve(url_rotulos, caminho_rotulos)
+
+    extra = carregar_csv(caminho_rotulos)
+    extra = criar_classe_binaria(extra)
+    extra = extrair_identificador_paciente(extra)
+
+    pacientes_repetidos = (
+        set(extra["patient_id"]) & set(dados["patient_id"])
+    )
+
+    if pacientes_repetidos:
+        raise ValueError(
+            f"{len(pacientes_repetidos)} pacientes do test de 2015 também "
+            "estão no train; eles vazariam para a validação ou o teste."
+        )
+
+    extra["pasta_processada"] = pasta_processada
+
+    print(
+        f"\nImagens extras: {len(extra)} "
+        f"({extra['patient_id'].nunique()} pacientes, nenhum em comum "
+        "com o train)."
+    )
+
+    _mostrar_distribuicao(extra, "level_original")
+
+    return extra[
+        ["image", "level_original", "target", "patient_id", "pasta_processada"]
+    ]
+
+
+def ampliar_treino(
+    df_treino,
+    df_extra,
+    pasta_processada=configuracao.PASTA_IMAGENS_OTIMIZADAS
+):
+    """
+    Junta as imagens extras ao treino. A validação e o teste não mudam.
+    Cada linha guarda em `pasta_processada` a pasta da sua imagem, que o
+    pipeline de dados usa para montar o caminho.
+    """
+
+    treino = df_treino.copy()
+    treino["pasta_processada"] = pasta_processada
+
+    ampliado = pd.concat(
+        [treino, df_extra],
+        ignore_index=True
+    )
+
+    print(
+        f"\nTREINO ampliado: {len(treino)} + {len(df_extra)} = "
+        f"{len(ampliado)} imagens"
+    )
+
+    _mostrar_distribuicao(ampliado, "target")
+
+    return ampliado

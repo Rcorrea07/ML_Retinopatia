@@ -2,8 +2,9 @@
 Cola específica do Google Colab.
 
 Este módulo concentra tudo que só funciona dentro do Colab: montagem do
-Google Drive, extração do dataset, cache das imagens processadas no
-Drive e download de arquivos. O restante do pacote não depende do Colab.
+Google Drive, extração do dataset (train e, para o treino ampliado, o
+test de 2015), cache das imagens processadas no Drive e download de
+arquivos. O restante do pacote não depende do Colab.
 
 Observação: no notebook original a extração usava os atalhos de shell do
 IPython (`!unzip`, `!cat`), que não existem em um arquivo `.py`. Aqui os
@@ -70,6 +71,55 @@ def extrair_rotulos(
     )
 
 
+def _extrair_imagens(
+    nome,
+    pasta_imagens,
+    caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
+    pasta_base=configuracao.PASTA_BASE
+):
+    """
+    Extrai as imagens de uma parte do dataset ("train" ou "test").
+
+    No zip principal cada parte é um zip dividido em pedaços de ~8 GB
+    (nome.zip.001, .002, ...). O 7z lê os pedaços em sequência, sem
+    juntá-los num arquivo único (o cat antigo duplicava ~35 GB no
+    disco), e os pedaços são apagados depois da extração.
+    """
+
+    if os.path.isdir(pasta_imagens) and os.listdir(pasta_imagens):
+        print(f"As imagens de '{nome}' já foram extraídas.")
+        return
+
+    os.makedirs(
+        pasta_base,
+        exist_ok=True
+    )
+
+    primeira_parte = os.path.join(pasta_base, f"{nome}.zip.001")
+
+    if not os.path.isfile(primeira_parte):
+        print(f"Copiando os pedaços de '{nome}' do ZIP principal...")
+        _executar(
+            f'unzip -q -o "{caminho_zip_principal}" "{nome}.zip.*" '
+            f'-d "{pasta_base}"'
+        )
+
+    print(
+        f"Extraindo as imagens de '{nome}' "
+        "(isso vai levar alguns minutos)..."
+    )
+    _executar(
+        f'7z x -y -bd -o"{pasta_base}" "{primeira_parte}" > /dev/null'
+    )
+
+    _executar(
+        f'rm -f "{pasta_base}/{nome}.zip."0* '
+        f'"{pasta_base}/{nome}_completo.zip"'
+    )
+
+    print(f"Imagens de '{nome}' extraídas em: {pasta_imagens}")
+
+
 def extrair_dataset(
     caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
     pasta_base=configuracao.PASTA_BASE,
@@ -77,53 +127,59 @@ def extrair_dataset(
     somente_rotulos=False
 ):
     """
-    Extrai o dataset para o disco local do Colab.
-
-    A extração é inteligente: se a pasta de imagens já existir, a etapa
-    inteira é pulada para economizar tempo. Com `somente_rotulos=True`
-    (imagens processadas restauradas do cache), extrai só o CSV.
+    Extrai o CSV de rótulos e as imagens do "train" para o disco local
+    do Colab. Cada etapa é pulada se o resultado já existir. Com
+    `somente_rotulos=True` (imagens processadas restauradas do cache),
+    extrai só o CSV.
     """
 
+    extrair_rotulos(caminho_zip_principal, pasta_base)
+
     if somente_rotulos:
-        extrair_rotulos(caminho_zip_principal, pasta_base)
         return
 
-    print(" Verificando o ambiente de dados...")
+    _extrair_imagens(
+        "train",
+        pasta_imagens,
+        caminho_zip_principal,
+        pasta_base
+    )
 
-    if not os.path.exists(pasta_imagens):
-        os.makedirs(
-            pasta_base,
-            exist_ok=True
-        )
 
-        print("Extraindo ZIP principal...")
-        _executar(
-            f'unzip -q -o "{caminho_zip_principal}" -d "{pasta_base}"'
-        )
+def preparar_imagens_extra(
+    df_extra,
+    pasta_imagens=configuracao.PASTA_IMAGENS_EXTRA,
+    pasta_saida=configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA,
+    caminho_zip_cache=configuracao.CAMINHO_ZIP_CACHE_EXTRA,
+    caminho_lista_suspeitas=configuracao.CAMINHO_LISTA_SUSPEITAS_EXTRA
+):
+    """
+    Deixa prontas as imagens extras (test de 2015) já processadas: usa o
+    cache do Drive se existir; senão extrai as fotos originais, processa
+    com o mesmo pré-processamento do train e salva o cache no Drive.
+    """
 
-        print("Extraindo CSV de labels...")
-        _executar(
-            f'unzip -q -o "{pasta_base}/trainLabels.csv.zip" -d "{pasta_base}"'
-        )
+    from . import pre_processamento
 
-        print(
-            "Juntando e extraindo as imagens de treino "
-            "(Isso vai levar alguns minutos)..."
-        )
-        _executar(
-            f"cat {pasta_base}/train.zip.* > {pasta_base}/train_completo.zip"
-        )
-        _executar(
-            f'unzip -q -o {pasta_base}/train_completo.zip -d "{pasta_base}"'
-        )
+    if restaurar_cache_imagens(pasta_saida, caminho_zip_cache):
+        return
 
-        print(" Extração concluída!")
+    # Libera os pedaços do train, que já foram extraídos
+    _executar(
+        f'rm -f "{configuracao.PASTA_BASE}/train.zip."0* '
+        f'"{configuracao.PASTA_BASE}/train_completo.zip"'
+    )
 
-    else:
-        print(
-            " Os dados já foram extraídos anteriormente. "
-            "Pulando esta etapa para economizar tempo."
-        )
+    _extrair_imagens("test", pasta_imagens)
+
+    pre_processamento.pre_processar_dataset(
+        df_extra,
+        pasta_imagens=pasta_imagens,
+        pasta_saida=pasta_saida,
+        caminho_lista_suspeitas=caminho_lista_suspeitas
+    )
+
+    salvar_cache_imagens(pasta_saida, caminho_zip_cache)
 
 
 def restaurar_cache_imagens(

@@ -208,8 +208,53 @@ CAMINHO_LISTA_SUSPEITAS = os.path.join(
     f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}.csv"
 )
 
-# Limita o número de threads para evitar sobrecarga
-MAXIMO_WORKERS = 8
+# Limita o número de threads para evitar sobrecarga (a A100 do Colab
+# tem 12 núcleos)
+MAXIMO_WORKERS = 12
+
+# ============================================================
+# DADOS EXTRAS (test da competição de 2015, só para o treino)
+# ============================================================
+
+# O zip do Kaggle tem 88.702 imagens: 35.126 do "train" (as únicas
+# usadas até a versão 3) e 53.576 do "test". Os rótulos do test não
+# vêm no zip: foram publicados depois pelos organizadores, no fórum da
+# competição, e são os mesmos que o TensorFlow Datasets usa. Com True,
+# as imagens do test entram só no treino; a validação e o teste do
+# projeto continuam os mesmos, para comparar com os treinos anteriores.
+USAR_DADOS_EXTRA = True
+
+URL_ROTULOS_EXTRA = (
+    "https://storage.googleapis.com/kaggle-forum-message-attachments/"
+    "90528/2877/retinopathy_solution.csv"
+)
+
+# Cópia dos rótulos no Drive (baixada uma vez)
+CAMINHO_ROTULOS_EXTRA = (
+    "/content/drive/MyDrive/Datasets/retinopathy_solution.csv"
+)
+
+PASTA_IMAGENS_EXTRA = os.path.join(
+    PASTA_BASE,
+    "test"
+)
+
+PASTA_IMAGENS_OTIMIZADAS_EXTRA = PASTA_IMAGENS_OTIMIZADAS + "_extra"
+
+CAMINHO_ZIP_CACHE_EXTRA = os.path.join(
+    PASTA_CACHE_DRIVE,
+    os.path.basename(PASTA_IMAGENS_OTIMIZADAS_EXTRA) + ".zip"
+)
+
+CAMINHO_LISTA_SUSPEITAS_EXTRA = os.path.join(
+    PASTA_CACHE_DRIVE,
+    f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}_extra.csv"
+)
+
+# Sufixo dos nomes de experimento e de modelo quando os dados extras
+# são usados (os resultados não se misturam com os treinos só com o
+# train)
+SUFIXO_DADOS = "_extra" if USAR_DADOS_EXTRA else ""
 
 # Quantidade de imagens mostradas na inspeção visual
 NUMERO_AMOSTRAS_INSPECAO = 20
@@ -331,6 +376,7 @@ NOME_EXPERIMENTO = (
     f"_pre{VERSAO_PRE_PROCESSAMENTO}"
     f"_split{VERSAO_SPLIT}"
     f"_seed{SEED}"
+    f"{SUFIXO_DADOS}"
     f"_{COMMIT_CODIGO}"
 )
 
@@ -419,11 +465,13 @@ TTA_ATIVO = True
 # ============================================================
 
 # Nome legível do modelo: rede, tamanho, versão do pré-processamento e
-# commit do código, por exemplo "B4_448_v3_1ccd2cb"
+# commit do código, por exemplo "B4_448_v3_1ccd2cb" ("B4_448_v3_extra_…"
+# com os dados extras)
 NOME_MODELO = (
     f"{BACKBONE.replace('EfficientNet', '')}"
     f"_{TAMANHO_IMAGEM[0]}"
     f"_{VERSAO_PRE_PROCESSAMENTO}"
+    f"{SUFIXO_DADOS}"
     f"_{COMMIT_CODIGO}"
 )
 

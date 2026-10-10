@@ -123,9 +123,17 @@ def criar_dataset(
     roda dentro do modelo.
     """
 
+    # Com a coluna `pasta_processada` (treino ampliado com as imagens
+    # extras), cada imagem vem da sua pasta; sem ela, de `pasta_imagens`
+    pastas = (
+        df["pasta_processada"]
+        if "pasta_processada" in df
+        else [pasta_imagens] * len(df)
+    )
+
     caminhos = [
-        os.path.join(pasta_imagens, nome)
-        for nome in df["image"]
+        os.path.join(pasta, nome)
+        for pasta, nome in zip(pastas, df["image"])
     ]
 
     formato = tuple(tamanho_imagem) + (3,)
