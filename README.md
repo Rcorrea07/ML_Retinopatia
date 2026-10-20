@@ -12,6 +12,25 @@ regressão:
 | 0 | Sem retinopatia (grau 0) |
 | 1 | Com retinopatia (graus 1 a 4) |
 
+## Campanha de modelos leves (20/10/2026)
+
+A branch `codex/campanha-retinopatia` acrescenta 11 perfis: dez variantes de
+pré-processamento/treino e um classificador explícito dos cinco graus **0–4**.
+EfficientNetB0 é a referência; MobileNetV3Large e destilação de B4 são alternativas.
+A prioridade é PWA com inferência no servidor e preparação posterior para celular.
+
+Abra os cinco notebooks `notebooks/Campanha_Posto_1.ipynb` a
+`Campanha_Posto_5.ipynb`, cada um em uma sessão GPU independente. Eles executam
+respectivamente `E01/E06/E11`, `E02/E07`, `E03/E08`, `E04/E09` e `E05/E10`.
+Uma fila não implica GPU alocada; a disponibilidade depende do Colab.
+
+Use o [guia operacional](docs/EXECUCAO_CAMPANHA.md) e o
+[protocolo de comparação](docs/PLANO_EXPERIMENTOS_2026-10-20.md).
+O [catálogo de fontes](docs/referencias_retinopatia.json) preserva todos os links
+e downloads; reconsulte os relatórios e códigos durante as próximas alterações.
+Treinamento exploratório avalia somente validação. O teste histórico já foi
+consultado e não é uma nova avaliação cega.
+
 ## Como executar
 
 O projeto é **executado no Google Colab** (por causa da GPU; a configuração padrão,
@@ -104,7 +123,8 @@ commit do código. O commit permite recuperar o código exato de cada treino.
 7. **Avaliação** — predições com test-time augmentation (espelhamentos). O limiar de
    decisão não é 0.5: ele é escolhido **na validação**, na curva ROC, como o ponto que
    atinge pelo menos **90% de sensibilidade** com o menor número de falsos positivos,
-   e então aplicado ao **teste**, que dá a estimativa honesta. As métricas são
+   e então aplicado ao **teste** no fluxo legado. Esse teste já foi consultado
+   repetidamente e é agora um benchmark histórico; a campanha não o avalia. As métricas são
    reportadas por olho e por paciente (probabilidade do paciente = maior entre os dois
    olhos, como na regra clínica de encaminhamento).
 8. **Diagnóstico** — sensibilidade por grau original, desempenho para retinopatia
@@ -122,16 +142,18 @@ rotações de 360°, combinação dos dois olhos do paciente (1º, 2º, 3º e 5�
 com saídas de regressão/ordinais e TTA com espelhamentos (notebooks de maior
 pontuação da APTOS).
 
-Próximos passos possíveis: incluir os rótulos do teste de 2015 (~53 mil imagens) e
-os dados da APTOS 2019, e fazer ensemble de dobras ou sementes.
+Os 53.576 rótulos do teste original de 2015 já estão disponíveis para treino.
+APTOS não entra no treino desta campanha e pode servir a uma avaliação externa,
+após auditoria de origem e duplicatas. A comparação inicial usa um único modelo
+e uma passagem por imagem; TTA é uma análise secundária.
 
 ## Reprodutibilidade
 
-Semente fixa (`SEED = 42`) aplicada a Python, NumPy e TensorFlow, com operações
-determinísticas ativadas quando o ambiente permite. Trocar a semente, o
-pré-processamento ou o mapeamento dos rótulos invalida os caches de imagens
-processadas e os CSVs de split já salvos — mude `VERSAO_PRE_PROCESSAMENTO` ou
-`VERSAO_SPLIT` em `configuracao.py`, ou regenere-os.
+Sementes separadas: `SEED_SPLIT=42` mantém os pacientes originais e
+`SEED_TREINO` controla Python, NumPy, TensorFlow e embaralhamento. Trocar apenas
+a semente de treino não altera o split nem o cache. A campanha identifica
+o cache por hash da receita de imagem; cada execução tem perfil, hash de
+configuração, commit e UUID próprios, preservando os resultados anteriores.
 
 Para carregar o modelo salvo, informe a camada personalizada:
 

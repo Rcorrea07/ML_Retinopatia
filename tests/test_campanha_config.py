@@ -72,6 +72,15 @@ print(json.dumps({'split':c.SEED_SPLIT,'seed':c.SEED_TREINO,
                 reservar_execucao(c)
             self.assertEqual(original, arquivo.read_bytes())
 
+    def test_falha_de_json_nao_substitui_arquivo_anterior(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "estado.json"
+            salvar_json(caminho, {"estado": "treinando", "epoca": 3})
+            original = caminho.read_bytes()
+            with self.assertRaises(ValueError):
+                salvar_json(caminho, {"metrica": float("nan")})
+            self.assertEqual(caminho.read_bytes(), original)
+
 
 if __name__ == "__main__":
     unittest.main()

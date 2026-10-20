@@ -493,8 +493,8 @@ def avaliar_modelo(
     # 4. MATRIZES E RELATÓRIOS
     print(
         "\nAtenção: os limiares foram escolhidos nesta validação, "
-        "então estes números são otimistas. Use o teste para a "
-        "estimativa final."
+        "então estes números são otimistas. O teste histórico já foi "
+        "consultado; uma nova estimativa independente exige dados externos retidos."
     )
 
     metricas_olho = relatar_desempenho(
@@ -584,9 +584,9 @@ def registrar_experimento(
     caminho_registro=None
 ):
     """
-    Acrescenta uma linha ao registro de experimentos no Drive: commit
-    do código, configuração principal, limiares e as métricas de
-    validação e de teste por olho e por paciente.
+    Grava um resumo individual no Drive: commit do código, configuração,
+    limiares e métricas de validação por olho e por paciente. Teste é opcional.
+    O CSV global só é atualizado pelo consolidador após as filas.
 
     Para escolher entre experimentos, compare as colunas de validação;
     as de teste só valem para o modelo final escolhido.
@@ -669,10 +669,14 @@ def relatar_cinco_graus(tabela, nome, pasta_resultados):
 def consolidar_experimentos(pasta_resultados=None):
     """Executar em apenas uma sessão após as filas: preserva linhas antigas."""
     from pathlib import Path
+    import json
     pasta = Path(pasta_resultados or os.path.dirname(configuracao.PASTA_RESULTADOS))
     destino = pasta / "registro_experimentos.csv"
     tabelas = [pd.read_csv(destino)] if destino.exists() else []
     for resumo in sorted(pasta.glob("*/resumo.csv")):
+        estado = resumo.parent / "estado_execucao.json"
+        if estado.exists() and json.loads(estado.read_text()).get("estado") != "concluido":
+            continue
         tabela = pd.read_csv(resumo)
         if "ensaio" in tabela:
             tabela = tabela[~tabela["ensaio"].astype(str).str.lower().eq("true")]

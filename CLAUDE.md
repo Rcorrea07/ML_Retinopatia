@@ -20,7 +20,7 @@ Editing happens locally (VS Code); **execution happens entirely inside Google Co
 - There is no local virtualenv, TensorFlow, or CUDA install, and none is wanted. Do not try to `pip install` the dependencies or run the pipeline locally, and do not assume any of the imports (`tensorflow`, `cv2`, `sklearn`, …) resolve on this machine.
 - `requirements.txt` is documentation of what Colab provides — not a local install target.
 - The code reaches Colab through git: the notebook's first cell clones `https://github.com/Rcorrea07/ML_Retinopatia.git` into `/content/ML_Retinopatia`, fetches and checks out `REVISAO_CODIGO` detached (default `origin/main`; a tag or commit reproduces an old run), and puts its `src/` on `sys.path`. `%autoreload 2` is enabled so re-running that cell picks up pushed edits without restarting the runtime. **Changes only reach Colab once pushed** — mention that when finishing work the user will run there.
-- **Every training is traceable to its code.** `COMMIT_CODIGO` (short hash read from git at import) is part of `NOME_EXPERIMENTO`, so new code never overwrites an old run's folder. `utilitarios.salvar_configuracao()` writes `configuracao.json` (all constants + commit, uncommitted-changes flag, GPU, TF version) and `codigo_src.zip` (the package as it ran). `avaliacao.registrar_experimento()` appends one row per finished run to `resultados/registro_experimentos.csv`. Don't pull mid-experiment: the commit, and with autoreload the results folder, would change. Tag runs worth keeping (`treino-v2` = `de5cc37`, the code the first v2 run used).
+- **Every training is traceable to its code.** `COMMIT_CODIGO` (short hash read from git at import) is part of `NOME_EXPERIMENTO`, so new code never overwrites an old run's folder. `utilitarios.salvar_configuracao()` writes `configuracao.json` (all constants + commit, uncommitted-changes flag, GPU, TF version) and `codigo_src.zip` (the package as it ran). `avaliacao.registrar_experimento()` writes a per-run `resumo.csv`; after the parallel queues finish, one call to `avaliacao.consolidar_experimentos()` updates `resultados/registro_experimentos.csv`. This avoids lost rows from concurrent writers. Don't pull mid-experiment: the commit, and with autoreload the results folder, would change. Tag runs worth keeping (`treino-v2` = `de5cc37`, the code the first v2 run used).
 - Each epoch's CSV history also gets the learning rate, peak GPU memory and system RAM (`MonitorRecursos`) — use it to size batch/resolution/backbone instead of guessing.
 - Dataset comes from Drive: `/content/drive/MyDrive/Datasets/diabetic-retinopathy-detection.zip`. Extraction, the preprocessed image cache (`/content/dataset_retina_v3_448`), and the split CSVs (`/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits/{treino,validacao,teste}_v2_seed_{SEED}.csv`) are all cached, and each step skips itself or reloads if its output already exists.
 - Everything that must survive a Colab disconnect lives under `MyDrive/ProjetoRetinopatia/`: `modelos/` (one final `.keras` per run, named `NOME_MODELO` = backbone_size_preprocessing_commit, e.g. `B4_448_v3_1ccd2cb.keras`; the v2 model is `B4_448_v2_de5cc37.keras`), `resultados/<NOME_EXPERIMENTO>/` (checkpoints, `CSVLogger` histories, `predicoes_*.csv`, `configuracao.json`, `codigo_src.zip`) plus `registro_experimentos.csv`, `relatorios/` and `notebooks/` (the user's PDFs and executed notebook copies, not written by code), and `dados_internos/` with `splits/` and `cache/` (a zip of the preprocessed images per preprocessing version — when it exists, the notebook restores it and extracts only `trainLabels.csv` instead of the raw dataset).
@@ -33,7 +33,21 @@ Only static checks are possible locally — the pipeline itself can be verified 
 python3 -m py_compile src/retinopatia/*.py
 ```
 
-There is no test suite, linter config, or build step.
+The campaign also has standard-library tests, run locally with
+`python3 -m unittest discover -s tests -v`. They do not import TensorFlow or
+execute ML. Runtime verification still requires Colab.
+
+## Campaign execution
+
+`docs/EXECUCAO_CAMPANHA.md` documents E01–E11 and the five thin worker notebooks.
+Profiles resolve before TF imports in isolated subprocesses. `SEED_SPLIT` stays
+42; `SEED_TREINO` can vary without replacing saved splits. Each run includes
+profile, resolved-config hash, commit and a unique ID. Resume requires explicit
+`RETINOPATIA_RETOMAR=1` with the same ID/config/code. Exploration never predicts
+the historical test. E11 is five-way classification (grades 0–4), with the old
+`doente` and `grau` outputs derived from class probabilities. Never invent grade 5.
+Do not claim training started from a notebook being open; verify run logs and
+checkpoints. Synthetic smoke metrics are not retinopathy scores.
 
 ## Module map
 
@@ -72,7 +86,7 @@ There is no test suite, linter config, or build step.
 
 ## Conventions and gotchas
 
-- **Hyperparameters live only in `configuracao.py`.** Don't reintroduce inline literals in modules or notebook cells; add a named constant instead. The one exception is `BACKBONE`, which `configuracao.py` reads from the `RETINOPATIA_BACKBONE` environment variable set in the notebook's first cell, so one commit can train several backbones (the backbone is part of `NOME_EXPERIMENTO`).
+- **Legacy defaults live in `configuracao.py`; campaign profiles live in `perfis_experimentos.json` and are resolved there before importing ML modules.** Don't reintroduce inline literals in modules or notebook cells; add a named constant instead. The one exception is `BACKBONE`, which `configuracao.py` reads from the `RETINOPATIA_BACKBONE` environment variable set in the notebook's first cell, so one commit can train several backbones (the backbone is part of `NOME_EXPERIMENTO`).
 - **No IPython magics in `.py` files.** `!unzip`/`!cat` were converted to `subprocess.run(..., shell=True, check=True)` in `ambiente_colab.py`; shell escapes only work in notebook cells.
 - **Both phases share one evaluation function and one callback factory** (`avaliar_modelo`, `criar_callbacks` + the `criar_callbacks_fase1/2` wrappers) and one compile function (`compilar_modelo`), and the visual inspection shares `processar_retina` with the batch pass. These were duplicated in the original notebook — keep them unified, parameterizing instead of copying.
 - In the notebook, `modelo` is the Keras model variable, so the module of the same name is never imported there; `construir_modelo` is imported directly to avoid the shadowing.

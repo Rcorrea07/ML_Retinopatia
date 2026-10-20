@@ -75,7 +75,8 @@ def _extrair_imagens(
     nome,
     pasta_imagens,
     caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
-    pasta_base=configuracao.PASTA_BASE
+    pasta_base=configuracao.PASTA_BASE,
+    nomes_esperados=None
 ):
     """
     Extrai as imagens de uma parte do dataset ("train" ou "test").
@@ -86,7 +87,11 @@ def _extrair_imagens(
     disco), e os pedaços são apagados depois da extração.
     """
 
-    if os.path.isdir(pasta_imagens) and os.listdir(pasta_imagens):
+    completa = (all(os.path.isfile(os.path.join(pasta_imagens, n))
+                    and os.path.getsize(os.path.join(pasta_imagens, n)) > 0
+                    for n in nomes_esperados) if nomes_esperados is not None
+                else os.path.isdir(pasta_imagens) and bool(os.listdir(pasta_imagens)))
+    if completa:
         print(f"As imagens de '{nome}' já foram extraídas.")
         return
 
@@ -97,7 +102,7 @@ def _extrair_imagens(
 
     primeira_parte = os.path.join(pasta_base, f"{nome}.zip.001")
 
-    if not os.path.isfile(primeira_parte):
+    if nomes_esperados is not None or not os.path.isfile(primeira_parte):
         print(f"Copiando os pedaços de '{nome}' do ZIP principal...")
         _executar(
             f'unzip -q -o "{caminho_zip_principal}" "{nome}.zip.*" '
@@ -111,6 +116,12 @@ def _extrair_imagens(
     _executar(
         f'7z x -y -bd -o"{pasta_base}" "{primeira_parte}" > /dev/null'
     )
+
+    if nomes_esperados is not None and any(
+            not os.path.isfile(os.path.join(pasta_imagens, n))
+            or os.path.getsize(os.path.join(pasta_imagens, n)) == 0
+            for n in nomes_esperados):
+        raise RuntimeError(f"Extração de '{nome}' incompleta; partes preservadas para diagnóstico.")
 
     _executar(
         f'rm -f "{pasta_base}/{nome}.zip."0* '

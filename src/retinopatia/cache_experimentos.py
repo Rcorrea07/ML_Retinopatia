@@ -109,7 +109,7 @@ def preparar_cache(dados, extra=False):
         nome = "test" if extra else "train"
         brutas = c.PASTA_IMAGENS_EXTRA if extra else c.PASTA_IMAGENS
         criada_agora = not Path(brutas).exists()
-        ambiente_colab._extrair_imagens(nome, brutas)
+        ambiente_colab._extrair_imagens(nome, brutas, nomes_esperados=nomes)
         pre_processamento.pre_processar_dataset(
             dados, pasta_imagens=brutas, pasta_saida=str(pasta),
             caminho_lista_suspeitas=(c.CAMINHO_LISTA_SUSPEITAS_EXTRA if extra

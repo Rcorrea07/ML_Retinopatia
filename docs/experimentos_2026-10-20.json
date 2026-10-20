@@ -1,7 +1,7 @@
 {
   "versao": 1,
   "data_proposta": "2026-10-20",
-  "estado": "implementacao_em_andamento",
+  "estado": "implementado_em_verificacao_sintetica",
   "codigo_auditado": "22f95c4",
   "prioridade_implantacao": "PWA_com_inferencia_no_servidor_primeiro",
   "maximo_sessoes_simultaneas_desejado": 5,
@@ -77,7 +77,7 @@
       "id": "E01",
       "leva": 1,
       "nome": "B0 referencia 448",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "historico_B0_extra",
       "fontes": [
         "F11"
@@ -155,7 +155,7 @@
       "id": "E02",
       "leva": 1,
       "nome": "B0 sem Ben",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F06",
@@ -243,7 +243,7 @@
       "id": "E03",
       "leva": 1,
       "nome": "B0 Ben com sigma proporcional",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F03",
@@ -327,7 +327,7 @@
       "id": "E04",
       "leva": 1,
       "nome": "B0 cor suave",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F03"
@@ -410,7 +410,7 @@
       "id": "E05",
       "leva": 1,
       "nome": "B0 auxiliar com peso menor",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F06"
@@ -490,7 +490,7 @@
       "id": "E06",
       "leva": 2,
       "nome": "B0 resolucao 384",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F03",
@@ -578,7 +578,7 @@
       "id": "E07",
       "leva": 2,
       "nome": "B0 pooling medio",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F06"
@@ -659,7 +659,7 @@
       "id": "E08",
       "leva": 2,
       "nome": "B0 balanceamento suave",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F04",
@@ -740,7 +740,7 @@
       "id": "E09",
       "leva": 2,
       "nome": "MobileNetV3Large 384",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E06",
       "fontes": [
         "F17"
@@ -833,7 +833,7 @@
       "id": "E10",
       "leva": 2,
       "nome": "B0 384 com destilacao",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E06",
       "fontes": [
         "F18"
@@ -948,7 +948,7 @@
       "id": "E11",
       "leva": 3,
       "nome": "B0 classificacao dos cinco graus 0 a 4",
-      "estado": "implementacao_em_andamento",
+      "estado": "implementado_treino_real_pendente",
       "comparador": "E01",
       "fontes": [
         "F03",
@@ -1043,5 +1043,7 @@
     "verificar_colab_e_professor"
   ],
   "referencias": "referencias_retinopatia.json",
-  "observacao_classes": "E11 acrescentado a pedido do usuario em 20/10/2026: cinco classes reais 0-4; nao ha rotulo 5."
+  "observacao_classes": "E11 acrescentado a pedido do usuario em 20/10/2026: cinco classes reais 0-4; nao ha rotulo 5.",
+  "gpu_ensaio_confirmada": "Tesla T4; somente imagens sintéticas",
+  "guia_execucao": "docs/EXECUCAO_CAMPANHA.md"
 }

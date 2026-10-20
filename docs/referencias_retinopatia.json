@@ -250,5 +250,10 @@
       "executado": false
     }
   ],
-  "observacao": "Copias locais em relatorios/ sao ignoradas pelo Git; URLs e hashes ficam versionados. Reabrir as fontes na execucao."
+  "observacao": "Copias locais em relatorios/ sao ignoradas pelo Git; URLs e hashes ficam versionados. Reabrir as fontes na execucao.",
+  "reconsulta_implementacao_2026_10_20": {
+    "o_o": "Reabertos repositório remoto, convert.py e solution_outline.md do ZIP no commit e6f1cf3. Recorte/resize, balanceamento progressivamente suavizado e divisão por paciente confirmados. E08 é hipótese com pesos, não reprodução do resampling original.",
+    "keras": "Reaberta documentação oficial MobileNet. E09 com include_preprocessing=True e entrada 0–255.",
+    "ben": "Reabertura pela busca web não recuperou o branch arquivado; ZIP e relatório locais continuam disponíveis com checksums no catálogo. E03 mantém a adaptação raio/30."
+  }
 }

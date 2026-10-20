@@ -66,7 +66,7 @@ def calcular_pesos_classe(df_treino):
     if set(classes) != esperadas:
         raise ValueError(
             f"Classes inesperadas no treino: {classes}. "
-            "O esperado era encontrar as classes 0 e 1."
+            f"O esperado era encontrar {sorted(esperadas)}."
         )
 
     # Calcula os pesos de acordo com a quantidade
@@ -407,6 +407,10 @@ def treinar_fase_monitorada(modelo, modelo_base, treino_data, val_data,
         return modelo, modelo_base, None
     if epoca_inicial:
         modelo = tf.keras.models.load_model(ultimo, custom_objects={"GeM": GeM})
+        passos_salvos = estado.get("passos_otimizador")
+        if (passos_salvos is not None
+                and int(modelo.optimizer.iterations.numpy()) != passos_salvos):
+            raise RuntimeError("Snapshot e estado de época divergem; retomada automática recusada.")
         modelo_base = modelo.get_layer(modelo_base.name)
         if os.path.isfile(historico_caminho):
             historico_salvo = pd.read_csv(historico_caminho)
@@ -444,6 +448,7 @@ def treinar_fase_monitorada(modelo, modelo_base, treino_data, val_data,
             salvar_json(estado_caminho, {
                 "epocas_concluidas": epoch + 1,
                 "melhor_metrica": float(checkpoint.best),
+                "passos_otimizador": int(self.model.optimizer.iterations.numpy()),
                 "espera": int(early_stop.wait), "concluida": False})
 
     callbacks.append(EstadoRetomada())

@@ -142,7 +142,9 @@ def executar_experimento():
     if not c.ENSAIO and not os.path.ismount("/content/drive"):
         raise RuntimeError("Monte o Google Drive do projeto antes do treinamento real.")
     novo = reservar_execucao(c)
-    contador = 0
+    contador = max((int(p.stem.split("_")[-1]) for p in
+                    Path(c.PASTA_RESULTADOS).glob("figura_*.png")
+                    if p.stem.split("_")[-1].isdigit()), default=0)
     def salvar_figuras(*args, **kwargs):
         nonlocal contador
         for numero in plt.get_fignums():
@@ -165,6 +167,9 @@ def executar_experimento():
         treino, val = _dados_ensaio() if c.ENSAIO else _preparar_dados()
         if c.DESTILACAO and not c.ENSAIO:
             treino = _preparar_professor(treino)
+            # clear_session após o professor pode limpar a política global.
+            utilitarios.configurar_precisao_mista()
+            utilitarios.configurar_sementes(c.SEED_TREINO)
         treino_data = pipeline_dados.criar_dataset(treino, treino=True)
         val_data = pipeline_dados.criar_dataset(val, treino=False)
         if c.ENSAIO:
@@ -248,7 +253,8 @@ def executar_fila(perfis, posto="posto1", ensaio=False):
         id_execucao = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:8]
         ambiente = dict(os.environ, RETINOPATIA_PERFIL=perfil,
             RETINOPATIA_ID_EXECUCAO=id_execucao, RETINOPATIA_ENSAIO="1" if ensaio else "0",
-            PYTHONUNBUFFERED="1", MPLBACKEND="Agg")
+            PYTHONUNBUFFERED="1", MPLBACKEND="Agg",
+            PYTHONHASHSEED=os.environ.get("RETINOPATIA_SEED_TREINO", "42"))
         registro = pasta / f"{perfil}_{id_execucao}.json"
         salvar_json(registro, {"perfil": perfil, "id": id_execucao, "estado": "iniciando",
                                "versao_perfis": versao, "ensaio": ensaio})
@@ -269,6 +275,73 @@ def executar_fila(perfis, posto="posto1", ensaio=False):
         if ensaio and retorno:
             raise RuntimeError(f"Ensaio {perfil} falhou; verificar o log antes de treinar.")
     return concluido
+
+
+def empacotar_relatorios_ensaios(raiz="/content/retinopatia_ensaios"):
+    """Verifica artefatos sintéticos e reúne evidências pequenas para download.
+
+    Os modelos sintéticos permanecem no runtime e não são modelos candidatos.
+    O pacote contém configurações, código, hashes, gráficos, tabelas e logs.
+    """
+    import csv
+    import zipfile
+    raiz = Path(raiz)
+    execucoes = []
+    for pasta in sorted((raiz / "resultados").iterdir()):
+        if not pasta.is_dir():
+            continue
+        configuracao = json.loads((pasta / "configuracao.json").read_text())
+        if not configuracao.get("ENSAIO"):
+            raise ValueError("Esta função aceita somente ensaios sintéticos.")
+        estado = json.loads((pasta / "estado_execucao.json").read_text())
+        if estado.get("estado") != "concluido":
+            raise RuntimeError(f"Ensaio não concluído: {pasta.name}")
+        necessarios = ["codigo_src.zip", "pesos_classe.json", "resumo.csv",
+                      "diagnostico_por_grau_validacao.csv",
+                      "diagnostico_cabecas_validacao.json",
+                      "diagnostico_agregacoes_validacao.csv"]
+        for fase in (1, 2):
+            necessarios += [f"historico_fase{fase}.csv",
+                f"melhor_modelo_fase{fase}.weights.h5", f"retomada_fase{fase}.keras",
+                f"estado_fase{fase}.json", f"metricas_validacao_fase{fase}.json",
+                f"predicoes_validacao_fase_{fase}_sem_tta.csv"]
+        if not all((pasta / nome).is_file() for nome in necessarios):
+            raise RuntimeError(f"Artefatos incompletos: {pasta.name}")
+        artefato = json.loads((pasta / "artefato_modelo.json").read_text())
+        if (not artefato["recarga_verificada"] or artefato["teste_avaliado"]
+                or sha256_arquivo(artefato["caminho"]) != artefato["sha256"]):
+            raise RuntimeError("Artefato final incompatível com o ensaio.")
+        if configuracao["MODO_GRAU"] == "categorico":
+            with (pasta / "predicoes_validacao_fase_2_sem_tta.csv").open() as arquivo:
+                for linha in csv.DictReader(arquivo):
+                    probs = [float(linha[f"prob_grau_{g}"]) for g in range(5)]
+                    if (abs(sum(probs) - 1) > 1e-5
+                            or abs(sum(probs[1:]) - float(linha["prob_doente"])) > 1e-5
+                            or abs(sum(g * p for g, p in enumerate(probs))
+                                   - float(linha["grau_previsto"])) > 1e-5):
+                        raise RuntimeError("Saídas derivadas dos cinco graus inconsistentes.")
+            necessarios += ["matriz_5_graus_fase_2_sem_tta.csv",
+                           "relatorio_5_graus_fase_2_sem_tta.json"]
+            if not all((pasta / nome).is_file() for nome in necessarios):
+                raise RuntimeError("Relatórios das cinco classes ausentes.")
+        execucoes.append({"perfil": configuracao["PERFIL_EXPERIMENTO"],
+            "id": configuracao["ID_EXECUCAO"], "commit": configuracao["COMMIT_CODIGO"],
+            "estado": "concluido", "artefatos_verificados": True,
+            "recarga_verificada": True, "modelo_sha256": artefato["sha256"]})
+    if not execucoes:
+        raise ValueError("Nenhum ensaio encontrado.")
+    salvar_json(raiz / "verificacao_ensaios.json", {
+        "sinteticos": True, "nao_usar_como_score": True,
+        "modelos_sinteticos_incluidos_no_zip": False, "execucoes": execucoes})
+    destino = raiz.parent / "relatorios_ensaios_retinopatia.zip"
+    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as arquivo:
+        for caminho in sorted(raiz.rglob("*")):
+            if caminho.is_file() and caminho.suffix in {".csv", ".json", ".png", ".zip", ".log"}:
+                arquivo.write(caminho, arcname=str(caminho.relative_to(raiz)))
+    print("Ensaios sintéticos verificados:", ", ".join(e["perfil"] for e in execucoes))
+    print("Treinamentos reais iniciados nesta verificação: 0")
+    print(f"Relatórios para download: {destino}")
+    return str(destino)
 
 
 def main():

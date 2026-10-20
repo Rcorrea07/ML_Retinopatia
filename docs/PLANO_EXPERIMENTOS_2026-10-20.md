@@ -2,9 +2,15 @@
 
 Data: 20/10/2026. Código auditado: `22f95c4`.
 
-Estado: pesquisa e planejamento concluídos; os perfis abaixo ainda precisam ser
-implementados e verificados no Colab. Nenhum novo treinamento foi iniciado.
-As hipóteses não representam ganhos medidos.
+Estado: perfis E01–E11 implementados e publicados na branch
+`codex/campanha-retinopatia`. Verificação sintética iniciada em uma GPU T4
+no Colab; treinamento com fotos reais ainda não confirmado. A sessão do Brave
+foi desconectada durante a montagem do Drive. A conta do projeto não está
+autenticada no Chrome disponível. As hipóteses não representam ganhos medidos.
+
+Ver [guia operacional e execução](EXECUCAO_CAMPANHA.md) para filas, retomada,
+artefatos e estados confirmados. Este plano continua registrando a intenção;
+os arquivos de cada execução registram o que realmente aconteceu.
 
 ## Objetivo e escopo
 
@@ -66,7 +72,7 @@ muda as predições. Não comparar 0,8614 e 0,8702 como se fossem a mesma mediç
 | Restauração verifica pasta não vazia, sem manifesto completo | Extração interrompida pode parecer pronta | Validar integridade e imagens esperadas; preparar caches uma vez, publicar completos e reutilizar como somente leitura |
 | Defaults das funções são ligados na importação de `configuracao` | Mudar constantes depois dos imports deixa valores/caminhos antigos | Resolver perfil antes de importar o pacote; reiniciar sessão ao trocar perfil; congelar configuração durante execução |
 | `salvar_configuracao` salva constantes e `codigo_src.zip` | Uma mudança só em argumento de função pode não aparecer na configuração | Registrar configuração efetivamente aplicada, argumentos e manifesto do perfil; preservar o zip atual |
-| Pacientes extras são comparados por ID; duplicatas visuais não são verificadas | IDs diferentes não demonstram ausência de duplicação | Auditar duplicatas exatas e próximas, origem e conflitos de rótulos antes de congelar a campanha |
+| Pacientes extras são comparados por ID; duplicatas visuais não são verificadas | IDs diferentes não demonstram ausência de duplicação | Auditar hashes de JPEG/pixels processados e suspeitas por pHash; auditar fotos brutas e duplicatas próximas antes de declarar ausência de vazamento |
 | `processar_retina(aplicar_ben=False)` ainda usa defaults globais de cor | Passar apenas esse argumento pode deixar fundo incompatível | Resolver fundo e augmentation juntos: sem Ben = 0, com Ben = 128; cache próprio |
 | `GeM` aplica potência a ativações limitadas por epsilon | Outra arquitetura pode ter distribuição diferente; exportação não está testada | Comparar GAP, preservar carregamento de GeM e verificar conversão; MobileNet usa GAP nesta campanha |
 | A documentação antiga atribui um teto aos dados e afirma ausência de vazamento | São conclusões mais fortes que a evidência disponível | Tratar como hipóteses; auditar dados e repetir finalistas sem escolher pela métrica de teste |
@@ -110,11 +116,12 @@ entre scores de validação e teste, sozinha, não prova ausência de vazamento.
    externa. Reportar a sensibilidade obtida e seu intervalo; escolher 90% na
    validação não garante 90% em novos dados.
 
-## Dez configurações propostas
+## Onze configurações implementadas
 
 Cada perfil herda a referência, salvo alterações explícitas. Comparações são
 hipóteses, sem promessa de superar o score. Valores completos estão no
-[manifesto dos experimentos](experimentos_2026-10-20.json), ainda não executável.
+[manifesto dos experimentos](experimentos_2026-10-20.json). O módulo
+`campanha` lê a cópia versionada `src/retinopatia/perfis_experimentos.json`.
 
 Referência comum: B0/ImageNet, 448 px, GeM p=3, dropout 0,4, BCE + 0,5 Huber
 (delta 1), pesos binários balanceados nas duas cabeças, Adam, fase 1 de 2 épocas
@@ -133,6 +140,7 @@ a 1e-3; fase 2 de até 12 épocas, cosseno com aquecimento de uma época, máxim
 | E08 | 2 | E01 com raiz dos pesos balanceados, renormalizada para média 1 no treino | Balanceamento mais suave reduz falsos positivos? | F04, F15 + hipótese do projeto |
 | E09 | 2 | MobileNetV3Large alpha 1,0, 384 px, GAP; resto de E06 | Outra arquitetura leve oferece melhor custo/desempenho? | F17 |
 | E10 | 2 | E06 com destilação binária de B4 extra já treinada | O aluno de 384 px recupera parte do desempenho do professor? | F18 |
+| E11 | 2 | E01 com softmax de cinco graus, pesos balanceados por grau e triagem derivada de P(grau ≥ 1) | A classificação explícita dos graus ajuda a triagem? | Pedido do responsável / hipótese do projeto |
 
 E03 é adaptação da proporção raio/30; mantém a máscara v3 e não reproduz
 integralmente a solução de Ben Graham. E06 isola a resolução dentro da receita
@@ -147,8 +155,9 @@ outro rescale por fora. Os backbones existentes permanecem disponíveis.
 Em E10, professor congelado e auditado contra os mesmos pacientes retidos; sem
 usar teste/validação como dados de destilação. Proposta inicial: temperatura 1,
 perda binária = 0,7 BCE(rótulo real) + 0,3 BCE(probabilidade do professor), mais
-0,5 Huber(grau real). Professor vê a versão 448 px da mesma imagem/transformação
-geométrica que o aluno vê a 384 px. Reutilizar somente um professor para manter
+0,5 Huber(grau real). **Adaptação implementada:** o professor vê a versão
+original 448 px e gera alvos offline sem TTA; o aluno vê a versão 384 px com
+augmentation. Não há transformação geométrica compartilhada entre ambos. Reutilizar somente um professor para manter
 o orçamento; o arquivo dele e seu pré-processamento recebem checksum. Se não
 for verificável, E10 fica pendente; não trocar por outro experimento sem registrar.
 
@@ -156,6 +165,11 @@ As ideias de perda ordinal, CLAHE, focal loss, resolução progressiva, ensemble
 e dados adicionais ficam como próximas hipóteses. Não acumular mudanças antes
 de saber o efeito dessas dez. Combinar as melhorias confirmadas será uma rodada
 posterior declaradamente adaptativa, novamente escolhida sem o teste histórico.
+
+E11 utiliza os graus **0, 1, 2, 3 e 4** do EyePACS. Não existe classe 5
+nesses rótulos. `doente` é a soma das probabilidades 1–4 e `grau` é o valor
+esperado; a interface das saídas antigas é preservada. São gravadas também
+cinco probabilidades, classe argmax, matriz 5×5, métricas por grau e QWK.
 
 ## Como executar cinco ao mesmo tempo no Colab
 
@@ -215,13 +229,13 @@ Novos formatos de exportação não substituem os arquivos de treino antigos.
 - [ ] Reconsultar fontes F01–F18 de interesse, registrando data e divergências.
 - [ ] Recuperar do Drive configuração e predições B0/B4 extra; confirmar checksums.
 - [ ] Auditar dados/splits e fixar protocolo de seleção/calibração.
-- [ ] Implementar configuração por perfil, sementes separadas e ID sem colisões.
-- [ ] Implementar resumo individual, estado de execução e retomada sem perda.
-- [ ] Implementar modo exploração sem teste e persistência completa das análises.
-- [ ] Implementar perfis de pré-processamento e cache validado, sem apagar v3.
-- [ ] Implementar GAP, pesos suaves, MobileNet e destilação com saídas compatíveis.
+- [x] Implementar configuração por perfil, sementes separadas e ID sem colisões.
+- [x] Implementar resumo individual, estado de execução e retomada sem perda.
+- [x] Implementar modo exploração sem teste e persistência completa das análises.
+- [x] Implementar perfis de pré-processamento e cache validado, sem apagar v3.
+- [x] Implementar GAP, pesos suaves, MobileNet e destilação com saídas compatíveis.
 - [ ] Verificar estaticamente Python/notebooks; verificar execução e recarga no Colab.
-- [ ] Preparar cinco notebooks finos, publicar revisão e conferir recursos reais.
+- [x] Preparar e publicar cinco notebooks finos. Conferência das cinco GPUs ainda pendente.
 - [ ] Executar duas levas, consolidar resultados e repetir referência/finalistas.
 - [ ] Medir inferência do modelo de passagem única na FastAPI em CPU: p50/p95,
       RAM, tempo de pré-processamento e resposta por exame de um/dois olhos.
