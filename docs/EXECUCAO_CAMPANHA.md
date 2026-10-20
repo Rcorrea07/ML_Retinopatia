@@ -7,23 +7,32 @@ concluiu seis ensaios sintéticos (E01/E02/E03/E09/E10/E11) em uma **Tesla T4**.
 E08 concluiu na revisão `c7148d3`. Todos usaram precisão mista, batch 4,
 40 imagens sintéticas e duas épocas (uma por fase). Foram conferidos os arquivos
 de cada fase, recarga do modelo/otimizador, hashes dos modelos e coerência
-das saídas derivadas das cinco classes. Os seis testes locais também passaram. Os ensaios não usam
+das saídas derivadas das cinco classes. Os sete testes locais também passaram. Os ensaios não usam
 ImageNet nem fotos do projeto e **não medem desempenho de retinopatia**.
 
-- [Notebook de ensaio ativo no Chrome](https://colab.research.google.com/drive/1fnpmy62CJhij3wsHshKzMZceJb7exlQ2)
-- [Verificação criada na conta do projeto, antes da desconexão do Brave](https://colab.research.google.com/drive/1uuCRV2no_gLxGEV9goiqbVMY7IU3Yauy?authuser=4)
-- [Referência B0 consultada](https://colab.research.google.com/drive/100PsKg_weebqXZ5XHAmvivG9SLQYlYfh?authuser=4)
+Os cinco notebooks foram criados e salvos pelo Brave na conta
+do projeto, com a estrutura original do Drive:
 
-Os notebooks publicados estão fixados em `8b2691a`, que acrescenta aos módulos
-verificados somente a explicitação dos pesos/perdas de E11 no manifesto.
+Os links privados dos cinco notebooks estão no relatório local ignorado pelo
+git: `relatorios/campanha_2026-10-20/EXECUCAO_PRIVADA.md`.
 
-O Brave deixou de estar disponível durante a conexão do Drive. O Chrome
-está conectado a outra conta do responsável, sem a conta eHealth do projeto.
-Não foi confirmado acesso ao dataset nessa sessão, nem iniciados cinco treinos
-com dados reais. A autorização do responsável está concedida; a pendência é
-a conexão/autenticação da conta que contém o Drive. O login de eHealth
-foi aberto no Chrome e o Google exigiu sua senha; a etapa ficou disponível
-para o responsável concluir diretamente no navegador.
+A montagem segue `ambiente_colab.montar_drive()` do projeto original.
+Três sessões receberam GPU T4/RAM alta. As duas primeiras montaram o Drive
+e iniciaram E01/E02 com dados reais (estado `preparando_dados`). A configuração
+e o código já foram salvos nas pastas de execução. O terceiro Drive está em
+reconexão. As épocas ainda não começaram. O Brave está na conta correta. Os arquivos históricos B0/B4 foram
+vistos na pasta `modelos`, inclusive `B4_448_v3_extra_22f95c4.keras` (335,3 MB).
+Sua configuração e hash ainda precisam ser conferidos pelo código antes de E10.
+
+A revisão `a6e457a` reserva o espaço do Drive para os artefatos: a conta mostra
+8,47 GB usados de 15 GB. Não duplica os ZIPs legados equivalentes. Receitas novas
+ficam no `/content` por padrão, com manifestos e tabelas de hashes copiados para
+cada execução no Drive. Após perder o runtime será necessário reconstruí-las.
+Todos os checkpoints, modelos, históricos e relatórios continuam persistentes.
+`RETINOPATIA_PERSISTIR_CACHES_NOVOS=1` permite novos ZIPs quando houver espaço.
+O verificador `tests/colab_verificar_cache.py` passou no primeiro runtime
+(`returncode=0`). Usou somente imagens sintéticas e pastas temporárias no Colab.
+
 
 ## Evidências locais
 
@@ -57,8 +66,18 @@ Os primeiros cinco são variações controladas da B0. Os seguintes comparam
 explicitamente **0/1/2/3/4**: não existe grau 5 no EyePACS. Conserva as saídas
 `doente` e `grau`, derivadas da distribuição das cinco classes.
 
-Se o Colab conceder menos GPUs, manter os mesmos perfis em filas nas GPUs
-disponíveis. Não usar várias contas para contornar limites do provedor.
+Na execução atual, o Colab recusou a quarta e quinta sessões com **“Sessões em
+excesso”**. O gerenciador mostra as três GPUs ocupadas pela campanha. As onze
+configurações foram distribuídas nas sessões disponíveis:
+
+| GPU disponível | Fila atual |
+| --- | --- |
+| Posto 1 | E01 → E06 → E11 |
+| Posto 2 | E02 → E07, depois E04 → E09 em célula enfileirada |
+| Posto 3 | E03 → E08 → E05 → E10 |
+
+Os postos 4/5 continuam salvos para um cenário com mais sessões, mas não devem
+ser iniciados junto dessas filas, pois repetiriam E04/E09 e E05/E10.
 Os notebooks conferem GPU e montagem do Drive antes do treino real. A
 preparação dos caches pode demorar; `estado_execucao.json` distingue preparação
 de dados de treinamento efetivo.
