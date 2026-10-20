@@ -91,7 +91,7 @@ def _rotulos(df):
     Monta o dicionário de rótulos das duas saídas, no formato (n, 1).
     """
 
-    return {
+    rotulos = {
         configuracao.SAIDA_DOENTE: (
             df["target"]
             .astype("float32")
@@ -105,6 +105,13 @@ def _rotulos(df):
             .reshape(-1, 1)
         )
     }
+    if configuracao.MODO_GRAU == "categorico":
+        rotulos[configuracao.SAIDA_CLASSES] = df["level_original"].astype("int32").values
+    if configuracao.DESTILACAO:
+        coluna = "prob_professor" if "prob_professor" in df else "target"
+        rotulos[configuracao.SAIDA_PROFESSOR] = (
+            df[coluna].astype("float32").values.reshape(-1, 1))
+    return rotulos
 
 
 def criar_dataset(

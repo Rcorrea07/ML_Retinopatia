@@ -21,6 +21,7 @@ O desbalanceamento entre as classes é compensado com pesos por amostra
 """
 
 import os
+import json
 
 import numpy as np
 import psutil
@@ -35,6 +36,7 @@ from tensorflow.keras.callbacks import (
 
 from . import configuracao
 from .modelo import compilar_modelo
+from .persistencia import salvar_json
 
 
 def calcular_pesos_classe(df_treino):
@@ -48,8 +50,9 @@ def calcular_pesos_classe(df_treino):
     print("A calcular os pesos matemáticos das classes...")
 
     # Converte a coluna target para números inteiros
+    coluna = "level_original" if configuracao.MODO_GRAU == "categorico" else "target"
     classes_reais_treino = (
-        df_treino["target"]
+        df_treino[coluna]
         .astype(int)
         .values
     )
@@ -59,7 +62,8 @@ def calcular_pesos_classe(df_treino):
     classes = np.unique(classes_reais_treino)
 
     # Verifica se as duas classes estão presentes
-    if set(classes) != {0, 1}:
+    esperadas = set(range(5)) if coluna == "level_original" else {0, 1}
+    if set(classes) != esperadas:
         raise ValueError(
             f"Classes inesperadas no treino: {classes}. "
             "O esperado era encontrar as classes 0 e 1."
@@ -75,6 +79,10 @@ def calcular_pesos_classe(df_treino):
 
     # Associa cada classe diretamente ao seu peso
     # Exemplo: {0: 0.65, 1: 2.10}
+    if configuracao.PESOS_AMOSTRA == "raiz_balanceados_normalizada_media_1":
+        pesos = np.sqrt(pesos)
+        frequencias = np.array([(classes_reais_treino == c).mean() for c in classes])
+        pesos = pesos / np.sum(pesos * frequencias)
     pesos_dicionario = dict(
         zip(
             classes.tolist(),
@@ -87,7 +95,7 @@ def calcular_pesos_classe(df_treino):
     for classe, peso in pesos_dicionario.items():
         print(
             f"Classe {classe} "
-            f"({configuracao.NOMES_CLASSES[classe]}): "
+            f"({configuracao.NOMES_GRAUS[classe] if coluna == 'level_original' else configuracao.NOMES_CLASSES[classe]}): "
             f"peso {peso:.4f}"
         )
 
@@ -108,17 +116,20 @@ def adicionar_pesos_amostra(treino_data, pesos_dicionario):
     """
 
     pesos = tf.constant(
-        [pesos_dicionario[0], pesos_dicionario[1]],
+        [pesos_dicionario[i] for i in sorted(pesos_dicionario)],
         dtype=tf.float32
     )
 
     def com_pesos(x, rotulos):
+        chave = (configuracao.SAIDA_CLASSES if configuracao.MODO_GRAU == "categorico"
+                 else configuracao.SAIDA_DOENTE)
         classes = tf.cast(
-            tf.reshape(rotulos[configuracao.SAIDA_DOENTE], [-1]),
+            tf.reshape(rotulos[chave], [-1]),
             tf.int32
         )
 
-        return x, rotulos, tf.gather(pesos, classes)
+        por_amostra = tf.gather(pesos, classes)
+        return x, rotulos, {nome: por_amostra for nome in rotulos}
 
     return treino_data.map(
         com_pesos,
@@ -356,3 +367,85 @@ def fine_tuning_fase2(
     modelo.load_weights(caminho_pesos_fase2)
 
     return historico_fase2
+
+
+def treinar_fase_monitorada(modelo, modelo_base, treino_data, val_data,
+                            pesos_dicionario, fase):
+    """Duas fases da campanha com snapshot completo e retomada explícita.
+
+    Preserva os checkpoints/históricos legados. O snapshot adicional inclui o
+    otimizador; o JSON preserva época, melhor métrica e espera do early stopping.
+    Reiniciar não reproduz bit a bit a ordem aleatória anterior dos dados.
+    """
+    from pathlib import Path
+    import pandas as pd
+    from .modelo import GeM
+
+    if fase not in (1, 2):
+        raise ValueError("Fase deve ser 1 ou 2.")
+    c = configuracao
+    pasta = Path(c.PASTA_RESULTADOS)
+    estado_caminho = pasta / f"estado_fase{fase}.json"
+    ultimo = pasta / f"retomada_fase{fase}.keras"
+    pesos = c.CAMINHO_PESOS_FASE1 if fase == 1 else c.CAMINHO_PESOS_FASE2
+    historico_caminho = c.CAMINHO_HISTORICO_FASE1 if fase == 1 else c.CAMINHO_HISTORICO_FASE2
+    epocas = c.EPOCAS_FASE1 if fase == 1 else c.EPOCAS_FASE2
+    paciencia = c.PACIENCIA_EARLY_STOP_FASE1 if fase == 1 else c.PACIENCIA_EARLY_STOP_FASE2
+    estado = json.loads(estado_caminho.read_text()) if estado_caminho.exists() else {}
+    if estado and not c.RETOMAR:
+        raise FileExistsError("Histórico de fase encontrado sem autorização de retomada.")
+    if estado.get("concluida"):
+        modelo.load_weights(pesos)
+        return modelo, modelo_base, None
+    epoca_inicial = int(estado.get("epocas_concluidas", 0))
+    if epoca_inicial:
+        modelo = tf.keras.models.load_model(ultimo, custom_objects={"GeM": GeM})
+        modelo_base = modelo.get_layer(modelo_base.name)
+        if os.path.isfile(historico_caminho):
+            historico_salvo = pd.read_csv(historico_caminho)
+            historico_salvo[historico_salvo["epoch"] < epoca_inicial].to_csv(
+                historico_caminho, index=False)
+    elif fase == 2:
+        modelo.load_weights(c.CAMINHO_PESOS_FASE1)
+        modelo_base.trainable = True
+        for camada in modelo_base.layers:
+            if isinstance(camada, tf.keras.layers.BatchNormalization):
+                camada.trainable = False
+        compilar_modelo(modelo, criar_taxa_cosseno(
+            treino_data, epocas, c.TAXA_APRENDIZADO_FASE2))
+
+    callbacks = criar_callbacks(pesos, historico_caminho, paciencia)
+    checkpoint, early_stop = callbacks[1:3]
+    # O carregamento explícito abaixo restaura o melhor checkpoint inclusive
+    # quando ele foi obtido antes da desconexão.
+    early_stop.restore_best_weights = False
+    callbacks[-1] = CSVLogger(historico_caminho, append=bool(epoca_inicial))
+
+    class EstadoRetomada(Callback):
+        def on_train_begin(self, logs=None):
+            if "melhor_metrica" in estado:
+                checkpoint.best = estado["melhor_metrica"]
+                early_stop.best = estado["melhor_metrica"]
+                early_stop.wait = estado.get("espera", 0)
+
+        def on_epoch_end(self, epoch, logs=None):
+            if not np.isfinite(logs.get(c.METRICA_MONITORADA, np.nan)):
+                raise RuntimeError("Métrica monitorada ausente ou não finita.")
+            temporario = str(ultimo).replace(".keras", ".parcial.keras")
+            self.model.save(temporario)
+            os.replace(temporario, ultimo)
+            salvar_json(estado_caminho, {
+                "epocas_concluidas": epoch + 1,
+                "melhor_metrica": float(checkpoint.best),
+                "espera": int(early_stop.wait), "concluida": False})
+
+    callbacks.append(EstadoRetomada())
+    historico = modelo.fit(
+        adicionar_pesos_amostra(treino_data, pesos_dicionario),
+        validation_data=val_data, epochs=epocas, initial_epoch=epoca_inicial,
+        callbacks=callbacks)
+    estado_final = json.loads(estado_caminho.read_text())
+    estado_final["concluida"] = True
+    salvar_json(estado_caminho, estado_final)
+    modelo.load_weights(pesos)
+    return modelo, modelo_base, historico

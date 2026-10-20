@@ -6,11 +6,13 @@ import json
 import os
 import shutil
 import subprocess
+import platform
 from datetime import datetime
 
 import tensorflow as tf
 
 from . import configuracao
+from .persistencia import salvar_json
 
 
 def configurar_sementes(
@@ -121,7 +123,10 @@ def _descrever_ambiente():
             tf.config.experimental.get_device_details(gpu).get("device_name")
             for gpu in gpus
         ],
-        "versao_tensorflow": tf.__version__
+        "versao_tensorflow": tf.__version__,
+        "versao_python": platform.python_version(),
+        "versao_keras": getattr(tf.keras, "__version__", "desconhecida"),
+        "compilacao_tensorflow": tf.sysconfig.get_build_info()
     }
 
 
@@ -149,10 +154,10 @@ def salvar_configuracao(
     )
 
     if os.path.isfile(caminho):
-        print(
-            "Atenção: esta pasta já tem um experimento com o mesmo "
-            "código e configuração, e ele será sobrescrito."
-        )
+        if configuracao.RETOMAR:
+            print("Configuração original preservada durante retomada.")
+            return
+        raise FileExistsError(f"Configuração já salva; sobrescrita recusada: {caminho}")
 
     constantes = {
         nome: valor
@@ -162,17 +167,7 @@ def salvar_configuracao(
 
     constantes["AMBIENTE"] = _descrever_ambiente()
 
-    with open(caminho, "w", encoding="utf-8") as arquivo:
-        json.dump(
-            constantes,
-            arquivo,
-            ensure_ascii=False,
-            indent=2,
-            # Conjuntos viram listas ordenadas; o resto vira texto
-            default=lambda valor: (
-                sorted(valor) if isinstance(valor, set) else str(valor)
-            )
-        )
+    salvar_json(caminho, constantes)
 
     pasta_pacote = os.path.dirname(os.path.abspath(__file__))
 

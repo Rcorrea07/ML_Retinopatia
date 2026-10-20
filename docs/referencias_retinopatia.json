@@ -1,0 +1,254 @@
+{
+  "versao_catalogo": 1,
+  "data_consulta": "2026-10-20",
+  "timezone": "America/Sao_Paulo",
+  "links_recebidos": [
+    "https://www.kaggle.com/competitions/aptos2019-blindness-detection/writeups/guanshuo-xu-1st-place-solution-summary",
+    "https://www.kaggle.com/competitions/aptos2019-blindness-detection/writeups/ods-ai-eye-of-private-lb-4th-place-solution-2nd-af",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/leaderboard?tab=public",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/reformed-gamblers-3rd-place-solution-report",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/o-o-team-o-o-solution-summary",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/min-pooling-competition-report-min-pooling-and-tha",
+    "https://www.kaggle.com/code/meenavyas/diabetic-retinopathy-detection",
+    "https://www.kaggle.com/code/kmader/inceptionv3-for-retinopathy-gpu-hr",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/leaderboard",
+    "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/leaderboard?tab=public"
+  ],
+  "fontes": [
+    {
+      "id": "F01",
+      "titulo": "EyePACS leaderboard privado",
+      "url": "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/leaderboard",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Tabela oficial final conferida no Brave.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F02",
+      "titulo": "EyePACS leaderboard publico",
+      "url": "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/leaderboard?tab=public",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Tabela oficial publica conferida no Brave; URL repetida no pedido preservada em links_recebidos.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F03",
+      "titulo": "EyePACS Min-Pooling",
+      "url": "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/min-pooling-competition-report-min-pooling-and-tha",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Writeup, PDF e script de preprocessamento lidos.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F04",
+      "titulo": "EyePACS o_O",
+      "url": "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/o-o-team-o-o-solution-summary",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Writeup e arquivos selecionados do repositorio lidos.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F05",
+      "titulo": "EyePACS Reformed Gamblers",
+      "url": "https://www.kaggle.com/competitions/diabetic-retinopathy-detection/writeups/reformed-gamblers-3rd-place-solution-report",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Writeup, PDF v2 e READMEs do ZIP lidos; nao foi auditado todo o codigo legado.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F06",
+      "titulo": "APTOS Guanshuo Xu",
+      "url": "https://www.kaggle.com/competitions/aptos2019-blindness-detection/writeups/guanshuo-xu-1st-place-solution-summary",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Kappa privado aproximado 0.936 relatado pelo autor; estrategia transdutiva, nao reproduzida.",
+      "reconsultar_na_implementacao": true,
+      "codigo_gem_identificado_nao_auditado": "https://github.com/filipradenovic/cnnimageretrieval-pytorch"
+    },
+    {
+      "id": "F07",
+      "titulo": "APTOS ODS.ai",
+      "url": "https://www.kaggle.com/competitions/aptos2019-blindness-detection/writeups/ods-ai-eye-of-private-lb-4th-place-solution-2nd-af",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Titulo conserva 4th; metadados indicam 2nd apos limpeza. Sem score numerico ou repositorio verificado.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F08",
+      "titulo": "Notebook Meena Vyas",
+      "url": "https://www.kaggle.com/code/meenavyas/diabetic-retinopathy-detection",
+      "data_consulta": "2026-10-20",
+      "estado": "parcial",
+      "observacao": "Pagina v12 e Apache 2.0 verificadas; iframe vazio; download bloqueado pelo Brave com ERR_BLOCKED_BY_CLIENT. Codigo e score nao verificados.",
+      "reconsultar_na_implementacao": true,
+      "download_bloqueado": "https://www.kaggle.com/kernels/scriptcontent/4781533/download"
+    },
+    {
+      "id": "F09",
+      "titulo": "Notebook K Scott Mader",
+      "url": "https://www.kaggle.com/code/kmader/inceptionv3-for-retinopathy-gpu-hr",
+      "data_consulta": "2026-10-20",
+      "estado": "parcial",
+      "observacao": "Pagina v6 e Apache 2.0 verificadas; conteudo nao renderizado; codigo, split e score pendentes.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F10",
+      "titulo": "Colab autorizado",
+      "url": "https://colab.research.google.com/?authuser=4",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Conta autorizada acessivel; interface Pro+; cinco GPUs ainda nao alocadas.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F11",
+      "titulo": "Notebook B0 do usuario",
+      "url": "https://colab.research.google.com/drive/100PsKg_weebqXZ5XHAmvivG9SLQYlYfh?authuser=4",
+      "data_consulta": "2026-10-20",
+      "estado": "baixado_e_lido",
+      "observacao": "Codigo 22f95c4, B0 extra, resultados de treino e avaliacao; celula de diagnostico sem saida salva.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F12",
+      "titulo": "Ben Graham codigo arquivado",
+      "url": "https://github.com/btgraham/SparseConvNet-archived/tree/kaggle_Diabetic_Retinopathy_competition",
+      "data_consulta": "2026-10-20",
+      "estado": "baixado_e_lido_parcialmente",
+      "observacao": "Encontrado seguindo link classic no README do repositorio atual; script de preprocessamento e agregacao lidos.",
+      "reconsultar_na_implementacao": true,
+      "url_antiga": "https://github.com/btgraham/SparseConvNet/tree/kaggle_Diabetic_Retinopathy_competition",
+      "estado_url_antiga": "404_confirmado_no_Brave"
+    },
+    {
+      "id": "F13",
+      "titulo": "o_O codigo",
+      "url": "https://github.com/sveitser/kaggle_diabetic",
+      "data_consulta": "2026-10-20",
+      "estado": "baixado_e_lido_parcialmente",
+      "observacao": "README, outline, convert.py e MIT lidos.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F14",
+      "titulo": "Jeffrey De Fauw codigo",
+      "url": "https://github.com/JeffreyDF/kaggle_diabetic_retinopathy",
+      "data_consulta": "2026-10-20",
+      "estado": "baixado_e_lido_parcialmente",
+      "observacao": "README, losses.py e MIT lidos. ZIP inclui artefatos; nenhum peso carregado.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F15",
+      "titulo": "Jeffrey De Fauw post",
+      "url": "https://defauw.ai/diabetic-retinopathy-detection/",
+      "data_consulta": "2026-10-20",
+      "estado": "lido_parcialmente",
+      "observacao": "Introducao e arquitetura consultadas. Encontrado a partir do leaderboard e repositorio do autor.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F16",
+      "titulo": "FAQ Colab",
+      "url": "https://research.google.com/colaboratory/faq.html",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Documentacao oficial consultada via ferramenta web; limites e hardware dinamicos.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F17",
+      "titulo": "MobileNetV3 Keras",
+      "url": "https://keras.io/api/applications/mobilenet/mobilenet_models/",
+      "data_consulta": "2026-10-20",
+      "estado": "lido",
+      "observacao": "Documentacao oficial consultada; include_preprocessing=True espera 0-255.",
+      "reconsultar_na_implementacao": true
+    },
+    {
+      "id": "F18",
+      "titulo": "Destilacao Keras",
+      "url": "https://keras.io/examples/vision/knowledge_distillation/",
+      "data_consulta": "2026-10-20",
+      "estado": "parcial",
+      "observacao": "Abertura retornou falha; descricao localizada em busca oficial. Codigo completo pendente antes de E10.",
+      "reconsultar_na_implementacao": true,
+      "codigo": "https://github.com/keras-team/keras-io/blob/master/examples/vision/knowledge_distillation.py"
+    }
+  ],
+  "downloads": [
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/ben_graham_codigo.zip",
+      "fonte": "F12",
+      "url": "https://codeload.github.com/btgraham/SparseConvNet-archived/zip/a6bdb0c938b3556c1e6c23d5a014db9f404502b9",
+      "repositorio": "https://github.com/btgraham/SparseConvNet-archived",
+      "ref": "kaggle_Diabetic_Retinopathy_competition",
+      "commit": "a6bdb0c938b3556c1e6c23d5a014db9f404502b9",
+      "bytes": 5949614,
+      "sha256": "f12c9e1a7fedbed5e6084c666e24a5345d2954707a089f1c98e59d7c98d66fae",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/o_o_codigo.zip",
+      "fonte": "F13",
+      "url": "https://codeload.github.com/sveitser/kaggle_diabetic/zip/e6f1cf3109eaf87db12d77d48f73e62a084fd10a",
+      "repositorio": "https://github.com/sveitser/kaggle_diabetic",
+      "ref": "master",
+      "commit": "e6f1cf3109eaf87db12d77d48f73e62a084fd10a",
+      "bytes": 98756,
+      "sha256": "e5f370d15cb0acd8fa6a8f97aec11e93cb72e6f7c6468b1a79d5d83edfc9ab93",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/jeffrey_codigo.zip",
+      "fonte": "F14",
+      "url": "https://codeload.github.com/JeffreyDF/kaggle_diabetic_retinopathy/zip/77c57811ad6386ad0548f2b755e0536c1d652774",
+      "repositorio": "https://github.com/JeffreyDF/kaggle_diabetic_retinopathy",
+      "ref": "master",
+      "commit": "77c57811ad6386ad0548f2b755e0536c1d652774",
+      "bytes": 165580286,
+      "sha256": "cd792358e70ee1f1280ddcc51ca2c97b4babf8732954041fabd2d50afa075702",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/ben_graham_competitionreport.pdf",
+      "fonte": "F03",
+      "url": "https://storage.googleapis.com/kaggle-forum-message-attachments/88655/2795/competitionreport.pdf",
+      "bytes": 2811996,
+      "sha256": "e79e415e0bfbc81af34ff14093b0307f3fda6d9efd08a3b4da6ccd6eeb623aad",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/reformed_gamblers_summary_v2.pdf",
+      "fonte": "F05",
+      "url": "https://storage.googleapis.com/kaggle-forum-message-attachments/88866/2815/Team_Reformed_Gamblers_Solution_Summary_v2.pdf",
+      "bytes": 280797,
+      "sha256": "30c990c0e70867ea6326dd985498d0a05fa204a9fceebbf844847af727c4f10a",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/rfg_submission_code.zip",
+      "fonte": "F05",
+      "url": "https://storage.googleapis.com/kaggle-forum-message-attachments/88866/2813/rfg_submission_code.zip",
+      "bytes": 229392,
+      "sha256": "e3eb16f348b94b0a05f1c648eadf7098a929c27597b5adcab79675cf378bee0a",
+      "executado": false
+    },
+    {
+      "arquivo": "relatorios/referencias/2026-10-20/Retinopatia_treino_B0_consultado.ipynb",
+      "fonte": "F11",
+      "url": "https://colab.research.google.com/drive/100PsKg_weebqXZ5XHAmvivG9SLQYlYfh?authuser=4",
+      "bytes": 519720,
+      "sha256": "20f53c437152e42681ac2ea5120b66358ab0f1a31b17dca22602d7f1b3728166",
+      "executado": false
+    }
+  ],
+  "observacao": "Copias locais em relatorios/ sao ignoradas pelo Git; URLs e hashes ficam versionados. Reabrir as fontes na execucao."
+}

@@ -16,6 +16,11 @@ Nesses casos, regenere os caches ou mude a versão no caminho
 
 import os
 import subprocess
+import copy
+import uuid
+from datetime import datetime, timezone
+
+from .perfis import carregar_perfil, hash_configuracao, validar_identificador
 
 # ============================================================
 # REPRODUTIBILIDADE
@@ -520,3 +525,131 @@ PASTA_DIAGNOSTICO_V2 = os.path.join(
     "resultados",
     "diagnostico_modelo_v2"
 )
+
+# ============================================================
+# CAMPANHA: RESOLVER ANTES QUE OS OUTROS MÓDULOS SEJAM IMPORTADOS
+# ============================================================
+# O notebook legado continua disponível. Perfis são executados em processos
+# separados, sem autoreload, para não misturar defaults de duas configurações.
+PERFIL = carregar_perfil()
+PERFIL_EXPERIMENTO = PERFIL["id"] if PERFIL else "legado"
+CONFIGURACAO_PERFIL = copy.deepcopy(PERFIL["configuracao"]) if PERFIL else {}
+SEED_SPLIT = 42
+SEED_TREINO = int(os.environ.get("RETINOPATIA_SEED_TREINO", SEED))
+SEED = SEED_TREINO
+POOLING = "GeM"
+MODO_GRAU = "regressao"
+SAIDA_CLASSES = "classes_grau"
+SAIDA_PROFESSOR = "professor"
+NOMES_GRAUS = ["Sem retinopatia", "Leve", "Moderada", "Grave", "Proliferativa"]
+NUMERO_GRAUS = 5
+PESOS_AMOSTRA = "balanceados_binarios"
+PESO_PERDA_CLASSES = 1.0
+DESTILACAO = None
+ALPHA_MOBILENET = 1.0
+PESOS_INICIAIS = "imagenet"
+MODO_EXPLORACAO = bool(PERFIL)
+ENSAIO = os.environ.get("RETINOPATIA_ENSAIO", "0") == "1"
+PASSOS_ENSAIO = 2
+AMOSTRAS_ENSAIO_POR_GRAU = 8
+RETOMAR = os.environ.get("RETINOPATIA_RETOMAR", "0") == "1"
+VERSAO_CAMPANHA = "2026-10-20"
+CAMINHO_PROFESSOR = os.path.join(PASTA_MODELOS, "B4_448_v3_extra_22f95c4.keras")
+CAMINHO_CONFIGURACAO_PROFESSOR = os.path.join(
+    PASTA_PROJETO_DRIVE, "resultados",
+    "EfficientNetB4_448_prev3_splitv2_seed42_extra_22f95c4", "configuracao.json"
+)
+HASH_PRE_PROCESSAMENTO = "legado"
+
+if PERFIL:
+    _c = CONFIGURACAO_PERFIL
+    BACKBONE = _c["backbone"]
+    TAMANHO_IMAGEM = tuple(_c["resolucao"])
+    TAMANHO_LOTE = _c["lote"]
+    SEED_SPLIT = _c["seed_split"]
+    VERSAO_SPLIT = _c["versao_split"]
+    USAR_DADOS_EXTRA = _c["dados_extra_eyepacs_2015"]
+    _p = _c["pre_processamento"]
+    APLICAR_BEN = _p["ben"]
+    SIGMA_BEN = _p["sigma_ben"]
+    EROSAO_MASCARA = _p["erosao_mascara"]
+    RAIO_MASCARA = _p["raio_mascara"]
+    COR_FUNDO = _p["cor_fundo"]
+    METODO_MASCARA = _p["mascara"]
+    LIMIAR_MASCARA = _p["limiar_mascara"]
+    BEN_RESPEITA_MASCARA = _p["ben_respeita_mascara"]
+    QUALIDADE_JPEG = _p["qualidade_jpeg"]
+    AUMENTO_DADOS = {k: v for k, v in _c["aumento_dados"].items()
+                     if k != "cor_preenchimento"}
+    if COR_FUNDO != _c["aumento_dados"]["cor_preenchimento"]:
+        raise ValueError("O fundo da imagem e do augmentation devem coincidir.")
+    POOLING = _c["pooling"]
+    GEM_P_INICIAL = _c["gem_p_inicial"] or 3.0
+    TAXA_DROPOUT = _c["dropout"]
+    PESO_PERDA_GRAU = _c["peso_perda_grau"]
+    DELTA_HUBER = _c["delta_huber"]
+    PESOS_AMOSTRA = _c["pesos_amostra"]
+    EPOCAS_FASE1 = _c["epocas_fase1"]
+    EPOCAS_FASE2 = _c["epocas_fase2"]
+    TAXA_APRENDIZADO_FASE1 = _c["lr_fase1"]
+    TAXA_APRENDIZADO_FASE2 = _c["lr_max_fase2"]
+    EPOCAS_AQUECIMENTO_FASE2 = _c["epocas_aquecimento"]
+    FRACAO_LR_FINAL = _c["fracao_lr_final"]
+    MODO_GRAU = _c.get("modo_grau", "regressao")
+    DESTILACAO = _c["destilacao"]
+    ALPHA_MOBILENET = _c.get("alpha_mobilenet", 1.0)
+    TTA_ATIVO = _c["avaliacao_principal"]["tta"]
+    # XLA não é necessário para o ensaio e pode recompilar por vários minutos.
+    COMPILACAO_XLA = False
+    _imagem = {k: v for k, v in _p.items() if k != "perfil"}
+    _imagem.update(resolucao=TAMANHO_IMAGEM,
+                   fracao_minima_diametro=FRACAO_MINIMA_DIAMETRO_RETINA,
+                   fracao_minima_mascara=FRACAO_MINIMA_MASCARA,
+                   raio_minimo=RAIO_MINIMO, implementacao="v3-campanha1")
+    HASH_PRE_PROCESSAMENTO = hash_configuracao(_imagem)[:16]
+    VERSAO_PRE_PROCESSAMENTO = f"v3c_{HASH_PRE_PROCESSAMENTO}"
+    PASTA_IMAGENS_OTIMIZADAS = (
+        f"/content/dataset_retina_{VERSAO_PRE_PROCESSAMENTO}_{TAMANHO_IMAGEM[0]}"
+    )
+    CONFIGURACAO_PERFIL["seed_treino"] = SEED_TREINO
+
+if ENSAIO:
+    EPOCAS_FASE1 = EPOCAS_FASE2 = 1
+    EPOCAS_AQUECIMENTO_FASE2 = 0
+    TAMANHO_LOTE = min(TAMANHO_LOTE, 4)
+    PESOS_INICIAIS = None
+
+FORMATO_ENTRADA = TAMANHO_IMAGEM + (3,)
+SUFIXO_DADOS = "_extra" if USAR_DADOS_EXTRA else ""
+PASTA_IMAGENS_OTIMIZADAS_EXTRA = PASTA_IMAGENS_OTIMIZADAS + "_extra"
+CAMINHO_ZIP_CACHE = os.path.join(PASTA_CACHE_DRIVE,
+                                os.path.basename(PASTA_IMAGENS_OTIMIZADAS) + ".zip")
+CAMINHO_ZIP_CACHE_EXTRA = os.path.join(
+    PASTA_CACHE_DRIVE, os.path.basename(PASTA_IMAGENS_OTIMIZADAS_EXTRA) + ".zip")
+CAMINHO_LISTA_SUSPEITAS = os.path.join(
+    PASTA_CACHE_DRIVE, f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}_{TAMANHO_IMAGEM[0]}.csv")
+CAMINHO_LISTA_SUSPEITAS_EXTRA = CAMINHO_LISTA_SUSPEITAS.replace(".csv", "_extra.csv")
+CONFIGURACAO_EFETIVA = {
+    "perfil": CONFIGURACAO_PERFIL, "backbone": BACKBONE,
+    "semente_treino": SEED_TREINO, "semente_split": SEED_SPLIT,
+    "lote": TAMANHO_LOTE, "ensaio": ENSAIO, "pesos_iniciais": PESOS_INICIAIS,
+    "epocas": [EPOCAS_FASE1, EPOCAS_FASE2], "xla": COMPILACAO_XLA,
+    "hash_imagens": HASH_PRE_PROCESSAMENTO
+}
+HASH_CONFIGURACAO = hash_configuracao(CONFIGURACAO_EFETIVA)[:16]
+ID_EXECUCAO = validar_identificador(os.environ.get(
+    "RETINOPATIA_ID_EXECUCAO",
+    datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S") + "_" + uuid.uuid4().hex[:10]
+))
+NOME_EXPERIMENTO = (
+    f"{PERFIL_EXPERIMENTO}_{BACKBONE}_{TAMANHO_IMAGEM[0]}"
+    f"_seed{SEED_TREINO}_{HASH_CONFIGURACAO}_{COMMIT_CODIGO}_{ID_EXECUCAO}"
+    + ("_ensaio" if ENSAIO else "")
+)
+NOME_MODELO = NOME_EXPERIMENTO
+PASTA_RESULTADOS = os.path.join(PASTA_PROJETO_DRIVE, "resultados", NOME_EXPERIMENTO)
+CAMINHO_MODELO_FINAL = os.path.join(PASTA_MODELOS, NOME_MODELO + ".keras")
+CAMINHO_PESOS_FASE1 = os.path.join(PASTA_RESULTADOS, "melhor_modelo_fase1.weights.h5")
+CAMINHO_PESOS_FASE2 = os.path.join(PASTA_RESULTADOS, "melhor_modelo_fase2.weights.h5")
+CAMINHO_HISTORICO_FASE1 = os.path.join(PASTA_RESULTADOS, "historico_fase1.csv")
+CAMINHO_HISTORICO_FASE2 = os.path.join(PASTA_RESULTADOS, "historico_fase2.csv")

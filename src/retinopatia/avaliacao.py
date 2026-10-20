@@ -129,45 +129,24 @@ def _variantes_tta(tta):
     ]
 
 
-def prever_saidas(
-    modelo,
-    dados,
-    tta=configuracao.TTA_ATIVO
-):
-    """
-    Gera, para cada imagem e na ordem do pipeline (que não embaralha),
-    a probabilidade de retinopatia e o grau previsto pela cabeça
-    auxiliar. Com TTA, devolve a média das predições da imagem original
-    e de seus espelhamentos.
-
-    Retorna:
-        (probabilidades, graus_previstos)
-    """
-
-    probabilidades = []
-    graus = []
-
+def prever_todas_saidas(modelo, dados, tta=configuracao.TTA_ATIVO):
+    """Média de todas as saídas, na ordem das imagens, incluindo cinco classes."""
+    acumuladas = {}
     for transformar in _variantes_tta(tta):
-        # O pipeline devolve (imagens, rótulos); só as imagens interessam
-        imagens = dados.map(
-            lambda x, *_, f=transformar: f(x)
-        )
-
+        imagens = dados.map(lambda x, *_, f=transformar: f(x))
         saida = modelo.predict(imagens, verbose=1)
-
-        # Um modelo carregado do disco pode devolver lista em vez de
-        # dicionário; os nomes das saídas dizem a ordem
         if not isinstance(saida, dict):
             saida = dict(zip(modelo.output_names, saida))
+        for nome, valores in saida.items():
+            acumuladas.setdefault(nome, []).append(np.asarray(valores))
+    return {nome: np.mean(valores, axis=0) for nome, valores in acumuladas.items()}
 
-        probabilidades.append(
-            np.asarray(saida[configuracao.SAIDA_DOENTE]).ravel()
-        )
-        graus.append(
-            np.asarray(saida[configuracao.SAIDA_GRAU]).ravel()
-        )
 
-    return np.mean(probabilidades, axis=0), np.mean(graus, axis=0)
+def prever_saidas(modelo, dados, tta=configuracao.TTA_ATIVO):
+    """Probabilidade binária e grau, preservando a interface legada."""
+    saida = prever_todas_saidas(modelo, dados, tta)
+    return (saida[configuracao.SAIDA_DOENTE].ravel(),
+            saida[configuracao.SAIDA_GRAU].ravel())
 
 
 def _agregar(valores, funcao):
@@ -447,7 +426,8 @@ def avaliar_modelo(
     historico,
     nome_fase,
     sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA,
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_resultados=configuracao.PASTA_RESULTADOS,
+    tta=configuracao.TTA_ATIVO
 ):
     """
     Executa a avaliação completa de uma fase de treino na validação:
@@ -467,7 +447,9 @@ def avaliar_modelo(
     # 2. PROBABILIDADES NA VALIDAÇÃO
     print("\nGerando probabilidades na validação...")
 
-    predicoes, graus_previstos = prever_saidas(modelo, val_data)
+    todas_saidas = prever_todas_saidas(modelo, val_data, tta=tta)
+    predicoes = todas_saidas[configuracao.SAIDA_DOENTE].ravel()
+    graus_previstos = todas_saidas[configuracao.SAIDA_GRAU].ravel()
 
     tabela = salvar_predicoes(
         df_val,
@@ -476,6 +458,15 @@ def avaliar_modelo(
         f"validacao_{_nome_arquivo(nome_fase)}",
         pasta_resultados
     )
+
+    if configuracao.SAIDA_CLASSES in todas_saidas:
+        classes_prob = todas_saidas[configuracao.SAIDA_CLASSES]
+        for grau in range(configuracao.NUMERO_GRAUS):
+            tabela[f"prob_grau_{grau}"] = classes_prob[:, grau]
+        tabela["classe_grau"] = np.argmax(classes_prob, axis=1)
+        tabela.to_csv(os.path.join(pasta_resultados,
+            f"predicoes_validacao_{_nome_arquivo(nome_fase)}.csv"), index=False)
+        relatar_cinco_graus(tabela, nome_fase, pasta_resultados)
 
     classes_olho = df_val["target"].astype(int).values
 
@@ -589,8 +580,8 @@ def avaliar_no_teste(
 
 def registrar_experimento(
     resultado_validacao,
-    resultado_teste,
-    caminho_registro=configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
+    resultado_teste=None,
+    caminho_registro=None
 ):
     """
     Acrescenta uma linha ao registro de experimentos no Drive: commit
@@ -601,7 +592,15 @@ def registrar_experimento(
     as de teste só valem para o modelo final escolhido.
     """
 
+    if caminho_registro is None:
+        # Cada processo publica só a própria linha. O consolidador tem escritor único.
+        caminho_registro = os.path.join(configuracao.PASTA_RESULTADOS, "resumo.csv")
     linha = {
+        "perfil": configuracao.PERFIL_EXPERIMENTO,
+        "seed_split": configuracao.SEED_SPLIT,
+        "seed_treino": configuracao.SEED_TREINO,
+        "hash_configuracao": configuracao.HASH_CONFIGURACAO,
+        "ensaio": configuracao.ENSAIO,
         "data": pd.Timestamp.now().isoformat(timespec="seconds"),
         "experimento": configuracao.NOME_EXPERIMENTO,
         "modelo": configuracao.NOME_MODELO,
@@ -618,6 +617,8 @@ def registrar_experimento(
         ("val", resultado_validacao),
         ("teste", resultado_teste)
     ):
+        if resultado is None:
+            continue
         for nivel in ("olho", "paciente"):
             metricas = resultado[f"metricas_{nivel}"]
 
@@ -645,3 +646,42 @@ def registrar_experimento(
     print(f"Experimento registrado em: {caminho_registro}")
 
     return registro
+
+
+def relatar_cinco_graus(tabela, nome, pasta_resultados):
+    """Persistência das cinco classes reais; não existe um sexto rótulo."""
+    from sklearn.metrics import cohen_kappa_score
+    from .persistencia import salvar_json
+    reais = tabela["level_original"].astype(int)
+    previstas = tabela["classe_grau"].astype(int)
+    matriz = confusion_matrix(reais, previstas, labels=range(5))
+    relatorio = classification_report(reais, previstas, labels=range(5),
+        target_names=configuracao.NOMES_GRAUS, output_dict=True, zero_division=0)
+    kappa = cohen_kappa_score(reais, previstas, weights="quadratic", labels=range(5))
+    pd.DataFrame(matriz, index=range(5), columns=range(5)).to_csv(
+        os.path.join(pasta_resultados, f"matriz_5_graus_{_nome_arquivo(nome)}.csv"))
+    salvar_json(os.path.join(pasta_resultados, f"relatorio_5_graus_{_nome_arquivo(nome)}.json"),
+                {"kappa_quadratico": float(kappa), "relatorio": relatorio})
+    print(f"Cinco graus — kappa quadrático: {kappa:.4f}")
+    return relatorio
+
+
+def consolidar_experimentos(pasta_resultados=None):
+    """Executar em apenas uma sessão após as filas: preserva linhas antigas."""
+    from pathlib import Path
+    pasta = Path(pasta_resultados or os.path.dirname(configuracao.PASTA_RESULTADOS))
+    destino = pasta / "registro_experimentos.csv"
+    tabelas = [pd.read_csv(destino)] if destino.exists() else []
+    for resumo in sorted(pasta.glob("*/resumo.csv")):
+        tabela = pd.read_csv(resumo)
+        if "ensaio" in tabela:
+            tabela = tabela[~tabela["ensaio"].astype(str).str.lower().eq("true")]
+        tabelas.append(tabela)
+    if not tabelas:
+        return pd.DataFrame()
+    resultado = pd.concat(tabelas, ignore_index=True)
+    resultado = resultado.drop_duplicates(subset=["experimento"], keep="last")
+    temporario = str(destino) + ".parcial"
+    resultado.to_csv(temporario, index=False)
+    os.replace(temporario, destino)
+    return resultado

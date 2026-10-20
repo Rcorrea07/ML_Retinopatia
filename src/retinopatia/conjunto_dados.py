@@ -89,10 +89,12 @@ def criar_classe_binaria(dados):
 
     # Converte os níveis para números inteiros.
     # errors="raise" faz o código parar se houver algum valor inválido.
-    dados["level_original"] = pd.to_numeric(
-        dados["level"],
-        errors="raise"
-    ).astype("int8")
+    niveis = pd.to_numeric(dados["level"], errors="raise")
+    if niveis.isna().any() or not niveis.isin(configuracao.NIVEIS_PERMITIDOS).all():
+        raise ValueError("Rótulos devem ser inteiros de 0 a 4, sem ausentes.")
+    dados["level_original"] = niveis.astype("int8")
+    if dados["image"].duplicated().any():
+        raise ValueError("O CSV contém nomes de imagem repetidos.")
 
     # Verifica se existem somente os graus esperados
     niveis_encontrados = set(
@@ -145,7 +147,7 @@ def extrair_identificador_paciente(dados):
 
 def dividir_treino_validacao_teste(
     dados,
-    seed=configuracao.SEED,
+    seed=configuracao.SEED_SPLIT,
     numero_splits=configuracao.NUMERO_SPLITS,
     dobra_teste=configuracao.DOBRA_TESTE,
     dobra_validacao=configuracao.DOBRA_VALIDACAO
@@ -224,7 +226,7 @@ def verificar_pacientes_disjuntos(df_treino, df_val, df_teste):
 
 def _caminhos_splits(
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED,
+    seed=configuracao.SEED_SPLIT,
     versao=configuracao.VERSAO_SPLIT
 ):
     """
@@ -246,7 +248,7 @@ def salvar_splits(
     df_val,
     df_teste,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Salva os conjuntos no Google Drive, permitindo reproduzir a mesma
@@ -278,7 +280,7 @@ def salvar_splits(
 def carregar_splits(
     dados,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Carrega os splits salvos anteriormente, se os três existirem.
@@ -312,6 +314,14 @@ def carregar_splits(
             f"{pasta_splits} ou mude VERSAO_SPLIT."
         )
 
+    concatenados = pd.concat(conjuntos, ignore_index=True)
+    if concatenados["image"].duplicated().any():
+        raise ValueError("Imagem repetida dentro dos splits salvos.")
+    colunas = ["image", "patient_id", "level_original", "target"]
+    esperado = dados[colunas].sort_values("image").reset_index(drop=True)
+    salvo = concatenados[colunas].sort_values("image").reset_index(drop=True)
+    if not esperado.astype(str).equals(salvo.astype(str)):
+        raise ValueError("Rótulos ou pacientes dos splits diferem do CSV atual.")
     verificar_pacientes_disjuntos(*conjuntos)
 
     print("\nSplits carregados de:")
@@ -371,7 +381,7 @@ def _mostrar_distribuicao(df, coluna):
 def preparar_dataset(
     caminho_csv=configuracao.CAMINHO_CSV,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Executa o preparo completo dos dados: leitura do CSV, criação da

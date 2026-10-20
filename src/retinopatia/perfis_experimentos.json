@@ -1,0 +1,830 @@
+{
+  "versao": 1,
+  "perfis": {
+    "E01": {
+      "nome": "B0 referencia 448",
+      "fontes": [
+        "F11"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E02": {
+      "nome": "B0 sem Ben",
+      "fontes": [
+        "F06",
+        "F07"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "sem_ben_448",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": false,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 0,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 0
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E03": {
+      "nome": "B0 Ben com sigma proporcional",
+      "fontes": [
+        "F03",
+        "F12"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "ben_raio_448",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 7.466666666666667,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E04": {
+      "nome": "B0 cor suave",
+      "fontes": [
+        "F03"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.03,
+          "fator_contraste": 0.03,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E05": {
+      "nome": "B0 auxiliar com peso menor",
+      "fontes": [
+        "F06"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.2,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E06": {
+      "nome": "B0 resolucao 384",
+      "fontes": [
+        "F03",
+        "F05",
+        "F07"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          384,
+          384
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3_384",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E07": {
+      "nome": "B0 pooling medio",
+      "fontes": [
+        "F06"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GlobalAveragePooling2D",
+        "gem_p_inicial": null,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E08": {
+      "nome": "B0 balanceamento suave",
+      "fontes": [
+        "F04",
+        "F15"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "raiz_balanceados_normalizada_media_1",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "regressao"
+      }
+    },
+    "E09": {
+      "nome": "MobileNetV3Large 384",
+      "fontes": [
+        "F17"
+      ],
+      "configuracao": {
+        "backbone": "MobileNetV3Large",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          384,
+          384
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3_384",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GlobalAveragePooling2D",
+        "gem_p_inicial": null,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "alpha_mobilenet": 1.0,
+        "include_preprocessing": true,
+        "modo_grau": "regressao"
+      }
+    },
+    "E10": {
+      "nome": "B0 384 com destilacao",
+      "fontes": [
+        "F18"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          384,
+          384
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3_384",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.5,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": {
+          "professor_esperado": "B4_448_v3_extra_22f95c4.keras",
+          "professor_verificado": false,
+          "professor_congelado": true,
+          "resolucao_professor": [
+            448,
+            448
+          ],
+          "temperatura": 1.0,
+          "peso_bce_rotulo_real": 0.7,
+          "peso_bce_professor": 0.3,
+          "dados_permitidos": "somente_treino",
+          "transformacao_geometrica_compartilhada": true
+        },
+        "modo_grau": "regressao"
+      }
+    },
+    "E11": {
+      "nome": "B0 classificacao dos cinco graus 0 a 4",
+      "fontes": [
+        "F03",
+        "F04",
+        "F11"
+      ],
+      "configuracao": {
+        "backbone": "EfficientNetB0",
+        "pesos_iniciais": "imagenet",
+        "resolucao": [
+          448,
+          448
+        ],
+        "lote": 32,
+        "seed_split": 42,
+        "seed_treino": 42,
+        "versao_split": "v2",
+        "dados_extra_eyepacs_2015": true,
+        "pre_processamento": {
+          "perfil": "v3",
+          "mascara": "limiar_fixo",
+          "limiar_mascara": 10,
+          "ben": true,
+          "ben_respeita_mascara": true,
+          "sigma_ben": 10.0,
+          "erosao_mascara": 3,
+          "raio_mascara": 0.9,
+          "cor_fundo": 128,
+          "qualidade_jpeg": 95
+        },
+        "aumento_dados": {
+          "fator_rotacao": 0.5,
+          "fator_zoom": 0.15,
+          "fator_brilho": 0.1,
+          "fator_contraste": 0.1,
+          "cor_preenchimento": 128
+        },
+        "pooling": "GeM",
+        "gem_p_inicial": 3.0,
+        "dropout": 0.4,
+        "perda_binaria": "BCE",
+        "peso_perda_grau": 0.0,
+        "delta_huber": 1.0,
+        "pesos_amostra": "balanceados_binarios",
+        "pesos_nas_cabecas": [
+          "doente",
+          "grau"
+        ],
+        "otimizador": "Adam",
+        "epocas_fase1": 2,
+        "lr_fase1": 0.001,
+        "epocas_fase2": 12,
+        "lr_max_fase2": 5e-05,
+        "epocas_aquecimento": 1,
+        "fracao_lr_final": 0.01,
+        "paciencia_fase1": 2,
+        "paciencia_fase2": 3,
+        "monitor": "val_doente_pr_auc",
+        "batch_normalization_congelada": true,
+        "precisao_mista": true,
+        "avaliar_teste": false,
+        "avaliacao_principal": {
+          "tta": false,
+          "agregacao_paciente": "max",
+          "sensibilidade_validacao": 0.9
+        },
+        "avaliacao_secundaria": {
+          "tta": true,
+          "variantes": 4
+        },
+        "destilacao": null,
+        "modo_grau": "categorico"
+      }
+    }
+  }
+}

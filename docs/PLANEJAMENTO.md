@@ -1,5 +1,12 @@
 # Planejamento das próximas etapas
 
+> Atualização de 20/10/2026: o plano atual está em
+> [Plano de experimentos](PLANO_EXPERIMENTOS_2026-10-20.md), com dez perfis
+> propostos, execução em duas levas de até cinco sessões e pesquisa das soluções
+> Kaggle. O texto abaixo é histórico de 07/10: precede os treinos com dados extras.
+> Afirmações de ausência de vazamento, teto de desempenho e tempos de inferência
+> devem ser lidas como hipóteses/estimativas, conforme a auditoria do plano atual.
+
 Atualizado em 07/10/2026, depois dos treinos v3 (B4 e B0, commit `1ccd2cb`).
 Base: relatórios de 06/10 (treino v2 de 10 h) e 07/10 (B4 × B0), contexto do
 PWA (`contexto_codex_retinopatia_pwa.txt`) e registro da integração do modelo

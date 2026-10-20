@@ -372,7 +372,9 @@ def processar_retina(
     tamanho_imagem=configuracao.TAMANHO_IMAGEM,
     aplicar_ben=configuracao.APLICAR_BEN,
     metodo_mascara=configuracao.METODO_MASCARA,
-    ben_respeita_mascara=configuracao.BEN_RESPEITA_MASCARA
+    ben_respeita_mascara=configuracao.BEN_RESPEITA_MASCARA,
+    sigma_ben=configuracao.SIGMA_BEN,
+    cor_fundo=None
 ):
     """
     Pré-processamento completo de uma foto de fundo de olho:
@@ -392,6 +394,8 @@ def processar_retina(
     Nos dois últimos casos a imagem devolvida é None.
     """
 
+    if cor_fundo is None:
+        cor_fundo = 128 if aplicar_ben else 0
     mascara = criar_mascara_retina(img, metodo_mascara)
 
     quadrada, mascara_quadrada, area_foto, status = centralizar_retina(
@@ -404,12 +408,13 @@ def processar_retina(
         return None, mascara, status
 
     if aplicar_ben and ben_respeita_mascara:
-        quadrada = normalizar_cor_ben_na_retina(quadrada, mascara_quadrada)
+        quadrada = normalizar_cor_ben_na_retina(
+            quadrada, mascara_quadrada, sigma=sigma_ben, cor_fundo=cor_fundo)
 
     elif aplicar_ben:
-        quadrada = normalizar_cor_ben(quadrada)
+        quadrada = normalizar_cor_ben(quadrada, sigma=sigma_ben)
 
-    processada = aplicar_mascara_circular(quadrada)
+    processada = aplicar_mascara_circular(quadrada, cor_fundo=cor_fundo)
 
     if (
         fracao_mascara(mascara_quadrada, area_foto)

@@ -29,7 +29,8 @@ BACKBONES = {
     "EfficientNetB3": applications.EfficientNetB3,
     "EfficientNetB4": applications.EfficientNetB4,
     "EfficientNetB5": applications.EfficientNetB5,
-    "EfficientNetV2S": applications.EfficientNetV2S
+    "EfficientNetV2S": applications.EfficientNetV2S,
+    "MobileNetV3Large": applications.MobileNetV3Large
 }
 
 
@@ -125,26 +126,34 @@ def compilar_modelo(
     (a Fase 2 usa cosseno com aquecimento).
     """
 
+    perdas = {
+        configuracao.SAIDA_DOENTE: tf.keras.losses.BinaryCrossentropy(),
+        configuracao.SAIDA_GRAU: tf.keras.losses.Huber(delta=delta_huber)
+    }
+    pesos = {configuracao.SAIDA_DOENTE: 1.0,
+             configuracao.SAIDA_GRAU: peso_perda_grau}
+    metricas = {
+        configuracao.SAIDA_DOENTE: criar_metricas(),
+        configuracao.SAIDA_GRAU: [tf.keras.metrics.MeanAbsoluteError(name="mae")]
+    }
+    if configuracao.MODO_GRAU == "categorico":
+        perdas[configuracao.SAIDA_CLASSES] = tf.keras.losses.SparseCategoricalCrossentropy()
+        pesos.update({configuracao.SAIDA_DOENTE: 0.0,
+                      configuracao.SAIDA_GRAU: 0.0,
+                      configuracao.SAIDA_CLASSES: configuracao.PESO_PERDA_CLASSES})
+        metricas[configuracao.SAIDA_CLASSES] = [
+            tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")]
+    if configuracao.DESTILACAO:
+        perdas[configuracao.SAIDA_PROFESSOR] = tf.keras.losses.BinaryCrossentropy()
+        pesos[configuracao.SAIDA_DOENTE] = configuracao.DESTILACAO["peso_bce_rotulo_real"]
+        pesos[configuracao.SAIDA_PROFESSOR] = configuracao.DESTILACAO["peso_bce_professor"]
     modelo.compile(
         optimizer=tf.keras.optimizers.Adam(
             learning_rate=taxa_aprendizado
         ),
-        loss={
-            configuracao.SAIDA_DOENTE: tf.keras.losses.BinaryCrossentropy(),
-            configuracao.SAIDA_GRAU: tf.keras.losses.Huber(
-                delta=delta_huber
-            )
-        },
-        loss_weights={
-            configuracao.SAIDA_DOENTE: 1.0,
-            configuracao.SAIDA_GRAU: peso_perda_grau
-        },
-        metrics={
-            configuracao.SAIDA_DOENTE: criar_metricas(),
-            configuracao.SAIDA_GRAU: [
-                tf.keras.metrics.MeanAbsoluteError(name="mae")
-            ]
-        },
+        loss=perdas,
+        loss_weights=pesos,
+        metrics=metricas,
         jit_compile=compilacao_xla
     )
 
@@ -174,10 +183,14 @@ def construir_modelo(
     print(f"A carregar a {nome_backbone} e a construir o modelo...")
 
     # Carrega a rede base sem a camada classificadora original
+    extras = ({"alpha": configuracao.ALPHA_MOBILENET,
+               "include_preprocessing": True}
+              if nome_backbone == "MobileNetV3Large" else {})
     modelo_base = BACKBONES[nome_backbone](
-        weights="imagenet",
+        weights=configuracao.PESOS_INICIAIS,
         include_top=False,
-        input_shape=formato_entrada
+        input_shape=formato_entrada,
+        **extras
     )
 
     # Fase 1: congela a rede base e treina apenas as cabeças
@@ -195,7 +208,8 @@ def construir_modelo(
     # de inferência mesmo depois do descongelamento no fine-tuning
     x = modelo_base(x, training=False)
 
-    x = GeM(name="gem")(x)
+    x = (GeM(name="gem")(x) if configuracao.POOLING == "GeM"
+         else layers.GlobalAveragePooling2D(name="pooling_medio", dtype="float32")(x))
 
     x = layers.Dropout(
         configuracao.TAXA_DROPOUT,
@@ -217,12 +231,28 @@ def construir_modelo(
         name=configuracao.SAIDA_GRAU
     )(x)
 
+    saidas = {configuracao.SAIDA_DOENTE: doente, configuracao.SAIDA_GRAU: grau}
+    if configuracao.DESTILACAO:
+        saidas[configuracao.SAIDA_PROFESSOR] = layers.Activation(
+            "linear", dtype="float32", name=configuracao.SAIDA_PROFESSOR)(doente)
+    if configuracao.MODO_GRAU == "categorico":
+        classes = layers.Dense(configuracao.NUMERO_GRAUS, activation="softmax",
+                               dtype="float32", name=configuracao.SAIDA_CLASSES)(x)
+        # Camadas fixas evitam Lambda e mantêm os nomes das saídas antigas.
+        saidas = {
+            configuracao.SAIDA_CLASSES: classes,
+            configuracao.SAIDA_DOENTE: layers.Dense(
+                1, use_bias=False, trainable=False, dtype="float32",
+                kernel_initializer=tf.keras.initializers.Constant([[0], [1], [1], [1], [1]]),
+                name=configuracao.SAIDA_DOENTE)(classes),
+            configuracao.SAIDA_GRAU: layers.Dense(
+                1, use_bias=False, trainable=False, dtype="float32",
+                kernel_initializer=tf.keras.initializers.Constant([[0], [1], [2], [3], [4]]),
+                name=configuracao.SAIDA_GRAU)(classes)
+        }
     modelo = models.Model(
         inputs=entrada,
-        outputs={
-            configuracao.SAIDA_DOENTE: doente,
-            configuracao.SAIDA_GRAU: grau
-        },
+        outputs=saidas,
         name="retinopatia"
     )
 
