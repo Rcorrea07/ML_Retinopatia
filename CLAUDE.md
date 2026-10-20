@@ -48,6 +48,11 @@ the historical test. E11 is five-way classification (grades 0–4), with the old
 `doente` and `grau` outputs derived from class probabilities. Never invent grade 5.
 Do not claim training started from a notebook being open; verify run logs and
 checkpoints. Synthetic smoke metrics are not retinopathy scores.
+Campaigns reuse existing cache ZIPs without duplicating equivalent legacy files.
+New image recipes stay on `/content` by default; manifests and per-image hashes
+are always copied to each run on Drive. This reserves the Drive quota for all
+model/checkpoint/report artifacts. Opt in to new persistent image ZIPs only with
+`RETINOPATIA_PERSISTIR_CACHES_NOVOS=1` after checking available storage.
 
 ## Module map
 

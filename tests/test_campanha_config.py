@@ -23,7 +23,8 @@ import json
 print(json.dumps({'split':c.SEED_SPLIT,'seed':c.SEED_TREINO,
 'modelo':c.NOME_MODELO,'resultado':c.NOME_EXPERIMENTO,
 'cache':c.PASTA_IMAGENS_OTIMIZADAS,'fundo':c.COR_FUNDO,
-'grau':c.MODO_GRAU,'tta':c.TTA_ATIVO,'classes':c.NUMERO_GRAUS}))"""
+'grau':c.MODO_GRAU,'tta':c.TTA_ATIVO,'classes':c.NUMERO_GRAUS,
+'persistir_cache':c.PERSISTIR_CACHES_NOVOS}))"""
         return json.loads(subprocess.check_output([sys.executable, "-c", comando],
                                                   env=ambiente, text=True))
 
@@ -46,6 +47,9 @@ print(json.dumps({'split':c.SEED_SPLIT,'seed':c.SEED_TREINO,
         self.assertEqual(c["grau"], "categorico")
         self.assertFalse(c["tta"])
         self.assertEqual(self.resolver("E02")["fundo"], 0)
+
+    def test_campanha_reserva_drive_para_modelos_e_relatorios(self):
+        self.assertFalse(self.resolver("E01")["persistir_cache"])
 
     def test_erro_em_perfil_ou_identificador_invalido(self):
         with self.assertRaises(ValueError):

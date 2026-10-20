@@ -79,6 +79,23 @@ def _inspecionar_imagem(item):
             "phash": phash}
 
 
+def _registrar_cache_na_execucao(pasta, extra, zip_origem=None):
+    """Preserva manifesto e hashes no Drive mesmo sem publicar um ZIP novo."""
+    sufixo = "extra" if extra else "treino"
+    destino = Path(c.PASTA_RESULTADOS)
+    destino.mkdir(parents=True, exist_ok=True)
+    for origem, nome in ((pasta / "hashes_imagens.csv", f"hashes_cache_{sufixo}.csv"),
+                          (pasta / "manifesto_cache.json", f"manifesto_cache_{sufixo}.json")):
+        temporario = destino / (nome + "." + uuid.uuid4().hex + ".parcial")
+        shutil.copyfile(origem, temporario)
+        os.replace(temporario, destino / nome)
+    salvar_json(destino / f"armazenamento_cache_{sufixo}.json", {
+        "pasta_local": str(pasta), "zip_reutilizado": zip_origem,
+        "persistir_caches_novos": c.PERSISTIR_CACHES_NOVOS,
+        "imagens_locais_volateis": True,
+        "retomada": "Reutiliza ZIP existente ou refaz as imagens após perder o runtime."})
+
+
 def preparar_cache(dados, extra=False):
     """Restaura ou constrói uma receita; valida cada imagem antes de treinar."""
     pasta = Path(c.PASTA_IMAGENS_OTIMIZADAS_EXTRA if extra else c.PASTA_IMAGENS_OTIMIZADAS)
@@ -93,6 +110,7 @@ def preparar_cache(dados, extra=False):
         hashes = pasta / "hashes_imagens.csv"
         if (hashes.exists() and sha256_arquivo(hashes) == m["hash_tabela"]
                 and all((pasta / n).is_file() for n in nomes)):
+            _registrar_cache_na_execucao(pasta, extra, m.get("zip_disponivel"))
             return pd.read_csv(hashes, dtype={"phash": str})
     origem = None
     if zip_destino.exists():
@@ -123,12 +141,16 @@ def preparar_cache(dados, extra=False):
         tabela = pd.DataFrame(executor.map(_inspecionar_imagem,
                                           ((n, pasta) for n in nomes)))
     tabela.to_csv(pasta / "hashes_imagens.csv", index=False)
+    # Um ZIP legado equivalente já é uma cópia persistente suficiente.
+    # Nunca o duplica sob o nome com hash da nova campanha.
+    zip_disponivel = origem if origem != "processamento_das_fotos_originais" else None
     salvar_json(manifesto, {"hash_receita": c.HASH_PRE_PROCESSAMENTO,
         "hash_nomes": nomes_hash, "numero_imagens": len(nomes),
         "formato": c.FORMATO_ENTRADA, "origem": origem,
+        "zip_disponivel": zip_disponivel,
         "hash_tabela": sha256_arquivo(pasta / "hashes_imagens.csv"),
         "tipo_hash": "JPEG e pixels processados; nao substituem auditoria das fotos brutas"})
-    if not zip_destino.exists():
+    if not zip_disponivel and c.PERSISTIR_CACHES_NOVOS and not zip_destino.exists():
         # Cada sessão usa um temporário próprio; só publica um ZIP completo.
         temporario = zip_destino.with_name(zip_destino.name + "." + uuid.uuid4().hex + ".parcial")
         zip_local = Path("/content") / (uuid.uuid4().hex + ".zip")
@@ -139,6 +161,14 @@ def preparar_cache(dados, extra=False):
         shutil.copyfile(zip_local, temporario)
         os.replace(temporario, zip_destino)
         zip_local.unlink()
+        zip_disponivel = str(zip_destino)
+        metadados = json.loads(manifesto.read_text())
+        metadados["zip_disponivel"] = zip_disponivel
+        salvar_json(manifesto, metadados)
+    elif not zip_disponivel:
+        print("Cache novo mantido no /content; manifesto e hashes serão salvos "
+              "com os resultados no Drive.", flush=True)
+    _registrar_cache_na_execucao(pasta, extra, zip_disponivel)
     return tabela
 
 

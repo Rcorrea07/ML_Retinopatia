@@ -552,6 +552,10 @@ DESTILACAO = None
 ALPHA_MOBILENET = 1.0
 PESOS_INICIAIS = "imagenet"
 MODO_EXPLORACAO = bool(PERFIL)
+# A campanha guarda imagens novas no disco temporário do Colab para reservar
+# a cota do Drive aos modelos e relatórios. Os caches existentes são reutilizados.
+PERSISTIR_CACHES_NOVOS = os.environ.get(
+    "RETINOPATIA_PERSISTIR_CACHES_NOVOS", "0" if PERFIL else "1") == "1"
 ENSAIO = os.environ.get("RETINOPATIA_ENSAIO", "0") == "1"
 PASSOS_ENSAIO = 2
 AMOSTRAS_ENSAIO_POR_GRAU = 8
@@ -637,7 +641,8 @@ CONFIGURACAO_EFETIVA = {
     "semente_treino": SEED_TREINO, "semente_split": SEED_SPLIT,
     "lote": TAMANHO_LOTE, "ensaio": ENSAIO, "pesos_iniciais": PESOS_INICIAIS,
     "epocas": [EPOCAS_FASE1, EPOCAS_FASE2], "xla": COMPILACAO_XLA,
-    "hash_imagens": HASH_PRE_PROCESSAMENTO
+    "hash_imagens": HASH_PRE_PROCESSAMENTO,
+    "persistir_caches_novos": PERSISTIR_CACHES_NOVOS
 }
 HASH_CONFIGURACAO = hash_configuracao(CONFIGURACAO_EFETIVA)[:16]
 ID_EXECUCAO = validar_identificador(os.environ.get(
