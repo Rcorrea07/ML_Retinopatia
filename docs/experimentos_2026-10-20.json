@@ -858,7 +858,8 @@
           "peso_bce_rotulo_real": 0.7,
           "peso_bce_professor": 0.3,
           "dados_permitidos": "somente_treino",
-          "transformacao_geometrica_compartilhada": true
+          "transformacao_geometrica_compartilhada": false,
+          "receita_implementada": "Professor 448 sem TTA gera alvos offline no treino; aluno 384 com augmentation; temperatura 1."
         }
       },
       "configuracao_proposta": {
@@ -937,7 +938,8 @@
           "peso_bce_rotulo_real": 0.7,
           "peso_bce_professor": 0.3,
           "dados_permitidos": "somente_treino",
-          "transformacao_geometrica_compartilhada": true
+          "transformacao_geometrica_compartilhada": false,
+          "receita_implementada": "Professor 448 sem TTA gera alvos offline no treino; aluno 384 com augmentation; temperatura 1."
         },
         "modo_grau": "regressao"
       }

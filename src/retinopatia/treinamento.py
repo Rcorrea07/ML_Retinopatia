@@ -398,6 +398,13 @@ def treinar_fase_monitorada(modelo, modelo_base, treino_data, val_data,
         modelo.load_weights(pesos)
         return modelo, modelo_base, None
     epoca_inicial = int(estado.get("epocas_concluidas", 0))
+    # A sessão pode cair entre salvar a última época e marcar a fase concluída.
+    # Evita um fit vazio e preserva o melhor checkpoint dessa fase.
+    if epoca_inicial >= epocas or (epoca_inicial and estado.get("espera", 0) >= paciencia):
+        modelo.load_weights(pesos)
+        estado["concluida"] = True
+        salvar_json(estado_caminho, estado)
+        return modelo, modelo_base, None
     if epoca_inicial:
         modelo = tf.keras.models.load_model(ultimo, custom_objects={"GeM": GeM})
         modelo_base = modelo.get_layer(modelo_base.name)

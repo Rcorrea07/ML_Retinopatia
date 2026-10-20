@@ -1,6 +1,7 @@
 """Caches verificáveis por receita, com reaproveitamento explícito do v3 legado."""
 
 import hashlib
+import binascii
 import json
 import os
 import shutil
@@ -48,7 +49,12 @@ def _restaurar(zip_origem, pasta, nomes):
         for nome, item in membros.items():
             destino = pasta / nome
             if destino.exists() and destino.stat().st_size == item.file_size:
-                continue
+                crc = 0
+                with destino.open("rb") as existente:
+                    for bloco in iter(lambda: existente.read(1024 * 1024), b""):
+                        crc = binascii.crc32(bloco, crc)
+                if crc & 0xffffffff == item.CRC:
+                    continue
             temporario = destino.with_suffix(".parcial")
             with arquivo.open(item) as origem, temporario.open("wb") as saida:
                 shutil.copyfileobj(origem, saida)

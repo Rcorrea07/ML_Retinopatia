@@ -139,6 +139,8 @@ def executar_experimento():
     from .modelo import construir_modelo, GeM
     from .persistencia import reservar_execucao
 
+    if not c.ENSAIO and not os.path.ismount("/content/drive"):
+        raise RuntimeError("Monte o Google Drive do projeto antes do treinamento real.")
     novo = reservar_execucao(c)
     contador = 0
     def salvar_figuras(*args, **kwargs):
@@ -191,12 +193,24 @@ def executar_experimento():
         for nome in antes:
             np.testing.assert_allclose(antes[nome].numpy(), depois[nome].numpy(), atol=1e-5, rtol=1e-4)
         del recarregado
+        if c.ENSAIO:
+            # O snapshot de retomada precisa restaurar também o otimizador.
+            retomada = tf.keras.models.load_model(
+                Path(c.PASTA_RESULTADOS) / "retomada_fase2.keras",
+                custom_objects={"GeM": GeM})
+            if int(retomada.optimizer.iterations.numpy()) <= 0:
+                raise RuntimeError("Snapshot sem os passos do otimizador.")
+            del retomada
         registrar_estado(c.PASTA_RESULTADOS, "avaliando_validacao")
         avaliacao.registrar_experimento(resultado)
         tabela = resultado["tabela"]
-        diagnostico.relatorio_por_grau(tabela, resultado["limiar_olho"], nome="Validação")
-        diagnostico.comparar_cabeca_grau(tabela)
-        diagnostico.comparar_agregacao_paciente(tabela)
+        diagnostico.relatorio_por_grau(
+            tabela, resultado["limiar_olho"], nome="Validação").to_csv(
+                Path(c.PASTA_RESULTADOS) / "diagnostico_por_grau_validacao.csv")
+        salvar_json(Path(c.PASTA_RESULTADOS) / "diagnostico_cabecas_validacao.json",
+                    diagnostico.comparar_cabeca_grau(tabela))
+        diagnostico.comparar_agregacao_paciente(tabela).to_csv(
+            Path(c.PASTA_RESULTADOS) / "diagnostico_agregacoes_validacao.csv")
         if not c.ENSAIO:
             diagnostico.intervalo_bootstrap(tabela, resultado["limiar_olho"],
                 resultado["limiar_paciente"], nome="Validação").to_csv(
@@ -220,7 +234,12 @@ def executar_fila(perfis, posto="posto1", ensaio=False):
     from datetime import datetime, timezone
     for perfil in perfis:
         carregar_perfil(perfil)
-    raiz = Path("/content/drive/MyDrive/ProjetoRetinopatia/campanhas/2026-10-20")
+    raiz_projeto = (os.environ.get("RETINOPATIA_RAIZ_ENSAIO",
+                    "/content/drive/MyDrive/ProjetoRetinopatia") if ensaio
+                    else "/content/drive/MyDrive/ProjetoRetinopatia")
+    if not ensaio and not os.path.ismount("/content/drive"):
+        raise RuntimeError("Drive não montado; fila real não iniciada.")
+    raiz = Path(raiz_projeto) / "campanhas/2026-10-20"
     pasta = raiz / ("ensaios" if ensaio else posto)
     pasta.mkdir(parents=True, exist_ok=True)
     versao = sha256_arquivo(Path(__file__).with_name("perfis_experimentos.json"))[:12]

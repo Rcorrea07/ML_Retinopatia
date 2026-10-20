@@ -66,6 +66,9 @@ CAMINHO_CSV = os.path.join(
 #   notebooks/        cópias dos notebooks executados, com as saídas
 #   dados_internos/   arquivos de trabalho do pipeline (splits e cache)
 PASTA_PROJETO_DRIVE = "/content/drive/MyDrive/ProjetoRetinopatia"
+if os.environ.get("RETINOPATIA_ENSAIO") == "1":
+    # Só o ensaio sintético pode funcionar sem o Drive do projeto.
+    PASTA_PROJETO_DRIVE = os.environ.get("RETINOPATIA_RAIZ_ENSAIO", PASTA_PROJETO_DRIVE)
 
 PASTA_MODELOS = os.path.join(
     PASTA_PROJETO_DRIVE,
