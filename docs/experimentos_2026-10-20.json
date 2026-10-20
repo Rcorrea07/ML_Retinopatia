@@ -996,7 +996,7 @@
         "perda_binaria": "BCE",
         "peso_perda_grau": 0.0,
         "delta_huber": 1.0,
-        "pesos_amostra": "balanceados_binarios",
+        "pesos_amostra": "balanceados_cinco_graus",
         "pesos_nas_cabecas": [
           "doente",
           "grau"
@@ -1024,7 +1024,10 @@
           "variantes": 4
         },
         "destilacao": null,
-        "modo_grau": "categorico"
+        "modo_grau": "categorico",
+        "perda_classes": "SparseCategoricalCrossentropy",
+        "peso_perda_classes": 1.0,
+        "peso_perda_binaria": 0.0
       }
     }
   ],
