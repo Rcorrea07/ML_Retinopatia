@@ -3,7 +3,7 @@
 Data: 20/10/2026. Código auditado: `22f95c4`.
 
 Estado: perfis E01–E11 implementados e publicados na branch
-`codex/campanha-retinopatia`. Verificação sintética iniciada em uma GPU T4
+`codex/campanha-retinopatia`. Sete ensaios sintéticos concluídos em uma GPU T4
 no Colab; treinamento com fotos reais ainda não confirmado. A sessão do Brave
 foi desconectada durante a montagem do Drive. A conta do projeto não está
 autenticada no Chrome disponível. As hipóteses não representam ganhos medidos.

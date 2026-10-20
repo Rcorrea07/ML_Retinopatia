@@ -3,19 +3,40 @@
 ## Estado confirmado em 20/10/2026
 
 Código publicado na branch `codex/campanha-retinopatia`. A revisão `5abe071`
-iniciou ensaio sintético em uma **Tesla T4**, com precisão mista, batch 4,
-40 imagens sintéticas e duas épocas (uma por fase). Os ensaios não usam
+concluiu seis ensaios sintéticos (E01/E02/E03/E09/E10/E11) em uma **Tesla T4**.
+E08 concluiu na revisão `c7148d3`. Todos usaram precisão mista, batch 4,
+40 imagens sintéticas e duas épocas (uma por fase). Foram conferidos os arquivos
+de cada fase, recarga do modelo/otimizador, hashes dos modelos e coerência
+das saídas derivadas das cinco classes. Os seis testes locais também passaram. Os ensaios não usam
 ImageNet nem fotos do projeto e **não medem desempenho de retinopatia**.
 
 - [Notebook de ensaio ativo no Chrome](https://colab.research.google.com/drive/1fnpmy62CJhij3wsHshKzMZceJb7exlQ2)
 - [Verificação criada na conta do projeto, antes da desconexão do Brave](https://colab.research.google.com/drive/1uuCRV2no_gLxGEV9goiqbVMY7IU3Yauy?authuser=4)
 - [Referência B0 consultada](https://colab.research.google.com/drive/100PsKg_weebqXZ5XHAmvivG9SLQYlYfh?authuser=4)
 
+Os notebooks publicados estão fixados em `8b2691a`, que acrescenta aos módulos
+verificados somente a explicitação dos pesos/perdas de E11 no manifesto.
+
 O Brave deixou de estar disponível durante a conexão do Drive. O Chrome
 está conectado a outra conta do responsável, sem a conta eHealth do projeto.
 Não foi confirmado acesso ao dataset nessa sessão, nem iniciados cinco treinos
 com dados reais. A autorização do responsável está concedida; a pendência é
-a conexão/autenticação da conta que contém o Drive.
+a conexão/autenticação da conta que contém o Drive. O login de eHealth
+foi aberto no Chrome e o Google exigiu sua senha; a etapa ficou disponível
+para o responsável concluir diretamente no navegador.
+
+## Evidências locais
+
+O pacote de relatórios foi baixado e copiado para
+`relatorios/campanha_2026-10-20/relatorios_ensaios_retinopatia.zip` (ignorado pelo git).
+São **187 arquivos**, sem os modelos sintéticos, que continuam no runtime. CRCs
+do ZIP e sete registros de conclusão foram conferidos localmente. O manifesto
+`verificacao_ensaios.json` e a captura `ensaios_concluidos.jpg` ficam nessa pasta.
+
+SHA256 do ZIP baixado:
+`d9e1e7134820acf9e1614bb6c9674cc475aa06a38acfab43fcf4d53200878fba`.
+Ambiente registrado: TensorFlow 2.21.0, Keras 3.13.2, Python 3.13.15 e Tesla T4.
+**Esses arquivos documentam verificação de software, sem score clínico.**
 
 ## Cinco postos, onze configurações
 
@@ -49,7 +70,8 @@ de dados de treinamento efetivo.
 2. Selecionar GPU e RAM alta, quando disponível. Conferir sessões existentes
    antes de alocar cinco GPUs, sem interromper trabalho alheio.
 3. Fixar `REVISAO_CODIGO` e executar setup + montagem do Drive.
-4. Executar os ensaios antes de consumir o dataset completo. E10 sintético
+4. `notebooks/Verificar_Campanha.ipynb` contém o ensaio reproduzível.
+   Executar os ensaios antes de consumir o dataset completo. E10 sintético
    verifica a perda/serialização; o professor real ainda exige auditoria.
 5. Iniciar as filas. Conferir `treinando_fase1/2` e crescimento dos históricos
    CSV/checkpoints. Abrir cinco abas não comprova cinco execuções.
