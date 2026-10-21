@@ -19,8 +19,8 @@ git: `relatorios/campanha_2026-10-20/EXECUCAO_PRIVADA.md`.
 A montagem segue `ambiente_colab.montar_drive()` do projeto original.
 Três sessões receberam GPU T4/RAM alta. As duas primeiras montaram o Drive
 e iniciaram E01/E02 com dados reais (estado `preparando_dados`). A configuração
-e o código já foram salvos nas pastas de execução. O terceiro Drive está em
-reconexão. As épocas ainda não começaram. O Brave está na conta correta. Os arquivos históricos B0/B4 foram
+e o código já foram salvos nas pastas de execução. O terceiro Drive também foi montado e E03 começou a preparar os dados.
+E01 entrou na primeira época (`treinando_fase1`); nenhum score final foi obtido. O Brave está na conta correta. Os arquivos históricos B0/B4 foram
 vistos na pasta `modelos`, inclusive `B4_448_v3_extra_22f95c4.keras` (335,3 MB).
 Sua configuração e hash ainda precisam ser conferidos pelo código antes de E10.
 
