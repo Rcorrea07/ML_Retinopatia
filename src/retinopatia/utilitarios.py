@@ -157,7 +157,7 @@ def salvar_configuracao(
     constantes = {
         nome: valor
         for nome, valor in vars(configuracao).items()
-        if nome.isupper()
+        if nome.isupper() and not nome.startswith("_")
     }
 
     constantes["AMBIENTE"] = _descrever_ambiente()

@@ -89,10 +89,12 @@ def criar_classe_binaria(dados):
 
     # Converte os níveis para números inteiros.
     # errors="raise" faz o código parar se houver algum valor inválido.
-    dados["level_original"] = pd.to_numeric(
-        dados["level"],
-        errors="raise"
-    ).astype("int8")
+    niveis = pd.to_numeric(dados["level"], errors="raise")
+    if niveis.isna().any() or not niveis.isin(configuracao.NIVEIS_PERMITIDOS).all():
+        raise ValueError("Rótulos devem ser inteiros de 0 a 4, sem ausentes.")
+    dados["level_original"] = niveis.astype("int8")
+    if dados["image"].duplicated().any():
+        raise ValueError("O CSV contém nomes de imagem repetidos.")
 
     # Verifica se existem somente os graus esperados
     niveis_encontrados = set(
@@ -145,7 +147,7 @@ def extrair_identificador_paciente(dados):
 
 def dividir_treino_validacao_teste(
     dados,
-    seed=configuracao.SEED,
+    seed=configuracao.SEED_SPLIT,
     numero_splits=configuracao.NUMERO_SPLITS,
     dobra_teste=configuracao.DOBRA_TESTE,
     dobra_validacao=configuracao.DOBRA_VALIDACAO
@@ -224,7 +226,7 @@ def verificar_pacientes_disjuntos(df_treino, df_val, df_teste):
 
 def _caminhos_splits(
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED,
+    seed=configuracao.SEED_SPLIT,
     versao=configuracao.VERSAO_SPLIT
 ):
     """
@@ -246,7 +248,7 @@ def salvar_splits(
     df_val,
     df_teste,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Salva os conjuntos no Google Drive, permitindo reproduzir a mesma
@@ -278,7 +280,7 @@ def salvar_splits(
 def carregar_splits(
     dados,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Carrega os splits salvos anteriormente, se os três existirem.
@@ -312,6 +314,14 @@ def carregar_splits(
             f"{pasta_splits} ou mude VERSAO_SPLIT."
         )
 
+    concatenados = pd.concat(conjuntos, ignore_index=True)
+    if concatenados["image"].duplicated().any():
+        raise ValueError("Imagem repetida dentro dos splits salvos.")
+    colunas = ["image", "patient_id", "level_original", "target"]
+    esperado = dados[colunas].sort_values("image").reset_index(drop=True)
+    salvo = concatenados[colunas].sort_values("image").reset_index(drop=True)
+    if not esperado.astype(str).equals(salvo.astype(str)):
+        raise ValueError("Rótulos ou pacientes dos splits diferem do CSV atual.")
     verificar_pacientes_disjuntos(*conjuntos)
 
     print("\nSplits carregados de:")
@@ -371,7 +381,7 @@ def _mostrar_distribuicao(df, coluna):
 def preparar_dataset(
     caminho_csv=configuracao.CAMINHO_CSV,
     pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED
+    seed=configuracao.SEED_SPLIT
 ):
     """
     Executa o preparo completo dos dados: leitura do CSV, criação da
@@ -521,3 +531,109 @@ def ampliar_treino(
     _mostrar_distribuicao(ampliado, "target")
 
     return ampliado
+
+
+def adicionar_par(df):
+    """
+    Acrescenta a cada olho a imagem do outro olho do mesmo paciente, no
+    mesmo conjunto (colunas `image_par` e, quando existir a coluna
+    `pasta_processada`, `pasta_processada_par`). Usado pelo modelo de
+    pares. Paciente com uma só foto usa a própria imagem como par.
+
+    A ordem das linhas não muda: as predições continuam alinhadas com o
+    DataFrame original.
+    """
+
+    resultado = df.copy()
+
+    colunas = ["image"] + (
+        ["pasta_processada"] if "pasta_processada" in df else []
+    )
+
+    # Para cada paciente, as linhas dos seus olhos; o par de um olho é a
+    # outra linha do mesmo paciente
+    posicoes = resultado.groupby("patient_id").indices
+
+    pares = np.arange(len(resultado))
+
+    olhos_por_paciente = {}
+
+    for indices in posicoes.values():
+        if len(indices) > 2:
+            raise ValueError(
+                "Paciente com mais de duas fotos no mesmo conjunto: "
+                f"{resultado.iloc[indices]['image'].tolist()}"
+            )
+
+        olhos_por_paciente[len(indices)] = (
+            olhos_por_paciente.get(len(indices), 0) + 1
+        )
+
+        if len(indices) == 2:
+            pares[indices[0]] = indices[1]
+            pares[indices[1]] = indices[0]
+
+    for coluna in colunas:
+        resultado[f"{coluna}_par"] = resultado[coluna].values[pares]
+
+    print(
+        f"Pares de olhos: {olhos_por_paciente.get(2, 0)} pacientes com os "
+        f"dois olhos, {olhos_por_paciente.get(1, 0)} com uma só foto "
+        "(par = a própria imagem)."
+    )
+
+    return resultado
+
+
+def reduzir_para_fumaca(
+    df_treino,
+    df_val,
+    df_teste,
+    pacientes_por_classe=40,
+    ativo=configuracao.FUMACA,
+    seed=configuracao.SEED_SPLIT
+):
+    """
+    Na execução de fumaça (`configuracao.FUMACA`), reduz cada conjunto a
+    poucos pacientes inteiros (metade com retinopatia em algum olho),
+    para conferir o código em minutos. Fora dela, devolve os conjuntos
+    sem mudança.
+
+    Retorna:
+        (df_treino, df_val, df_teste)
+    """
+
+    if not ativo:
+        return df_treino, df_val, df_teste
+
+    def reduzir(df):
+        doente_paciente = df.groupby("patient_id")["target"].max()
+
+        escolhidos = []
+
+        for classe in (0, 1):
+            pacientes = doente_paciente[doente_paciente == classe].index
+
+            escolhidos.extend(
+                pd.Series(pacientes)
+                .sample(
+                    min(pacientes_por_classe, len(pacientes)),
+                    random_state=seed
+                )
+                .tolist()
+            )
+
+        return df[df["patient_id"].isin(escolhidos)].reset_index(drop=True)
+
+    reduzidos = tuple(reduzir(df) for df in (df_treino, df_val, df_teste))
+
+    print(
+        "EXECUÇÃO DE FUMAÇA: "
+        + ", ".join(
+            f"{nome} {len(df)} imagens"
+            for nome, df in zip(("treino", "validação", "teste"), reduzidos)
+        )
+        + ". As métricas não valem como resultado."
+    )
+
+    return reduzidos

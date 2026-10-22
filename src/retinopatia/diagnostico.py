@@ -479,36 +479,60 @@ def listar_falsos_negativos(
 
 def relatorio_completo(
     resultado_validacao,
-    resultado_teste,
-    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS
+    resultado_teste=None,
+    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
+    pasta_resultados=configuracao.PASTA_RESULTADOS
 ):
     """
     Executa todo o diagnóstico a partir dos resultados de
-    `avaliacao.avaliar_modelo` (validação) e `avaliacao.avaliar_no_teste`
-    (teste), usando os limiares escolhidos na validação.
+    `avaliacao.avaliar_modelo` (validação) e, para o modelo final,
+    `avaliacao.avaliar_no_teste` (teste), usando os limiares escolhidos
+    na validação.
 
+    Sem `resultado_teste` (experimentos), as partes medidas no teste
+    passam a ser medidas na própria validação: servem para comparar
+    experimentos, mas são otimistas.
+
+    As tabelas também são gravadas em CSV na pasta do experimento.
     Retorna um dicionário com as tabelas de cada parte.
     """
 
     tabela_val = resultado_validacao["tabela"]
-    tabela_teste = resultado_teste["tabela"]
+
+    if resultado_teste is None:
+        tabela_medida, nome = tabela_val, "Validação"
+    else:
+        tabela_medida, nome = resultado_teste["tabela"], "Teste"
 
     limiar_olho = resultado_validacao["limiar_olho"]
     limiar_paciente = resultado_validacao["limiar_paciente"]
 
-    return {
-        "por_grau": relatorio_por_grau(tabela_teste, limiar_olho),
-        "referenciavel": avaliar_referenciavel(tabela_val, tabela_teste),
+    partes = {
+        "por_grau": relatorio_por_grau(tabela_medida, limiar_olho, nome),
+        "referenciavel": avaliar_referenciavel(tabela_val, tabela_medida),
         "cabeca_grau": comparar_cabeca_grau(tabela_val),
         "agregacao": comparar_agregacao_paciente(tabela_val),
         "bootstrap": intervalo_bootstrap(
-            tabela_teste,
+            tabela_medida,
             limiar_olho,
-            limiar_paciente
+            limiar_paciente,
+            nome
         ),
         "falsos_negativos": listar_falsos_negativos(
-            tabela_teste,
+            tabela_medida,
             limiar_olho,
-            pasta_imagens=pasta_imagens
+            pasta_imagens=pasta_imagens,
+            nome=nome
         )
     }
+
+    os.makedirs(pasta_resultados, exist_ok=True)
+
+    for parte, tabela in partes.items():
+        if isinstance(tabela, pd.DataFrame):
+            tabela.to_csv(os.path.join(
+                pasta_resultados,
+                f"diagnostico_{parte}_{'validacao' if resultado_teste is None else 'teste'}.csv"
+            ))
+
+    return partes
