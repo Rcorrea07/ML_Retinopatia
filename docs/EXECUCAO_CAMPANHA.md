@@ -177,3 +177,24 @@ Após os treinos: consolidar, comparar validação, repetir referência e dois
 finalistas com seeds 17/73 sem mudar split e medir custo de inferência no servidor.
 A API/PWA e exportação local ainda exigem trabalho posterior. Não há ganho de
 score confirmado até obter as execuções reais e comparar no protocolo definido.
+
+## Leitura dos resultados sem repetir inferência
+
+`notebooks/Analisar_Campanha.ipynb` usa CPU e checkout separado. Lê os arquivos
+salvos, exibe tabelas por fase/olho/paciente e as figuras PNG originais.
+`retinopatia.acompanhamento` não importa TensorFlow nem modifica os treinos.
+Cada chamada cria um novo relatório MD, CSV comparativo e JSON em
+`MyDrive/ProjetoRetinopatia/relatorios/campanha_2026-10-20/`.
+
+O checkpoint é selecionado pela PR-AUC de validação do Keras. O AP do relatório
+final usa `average_precision_score`; os dois cálculos não são numericamente
+idênticos. As métricas accuracy/precision/recall do histórico usam limiar 0,5.
+A avaliação detalhada escolhe o limiar na validação para sensibilidade ≥90%,
+com resultados por olho e por paciente. Não confundir essas duas leituras.
+
+O posto 1 foi conferido pelo arquivo de estado do Drive: a fase 1 terminou e
+o treino entrou na fase 2. Sua aba deixou de responder; isso não indicou parada
+do treino. A fase 1 tem ROC-AUC/AP por paciente de 0,7283/0,5954 e sensibilidade/
+especificidade de 0,9002/0,2262, ainda provisórios. Não atestam melhoria sobre
+a B0 histórica. Os postos 2/3 processam as receitas novas; os postos 4/5 seguem
+sem sessão pelo limite do Colab e seus perfis estão nas filas existentes.
