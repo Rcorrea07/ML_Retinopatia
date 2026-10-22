@@ -45,16 +45,38 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 
 | ID | Rodada | O que testa | Espec. sem TTA | Espec. TTA2 | Espec. TTA4 | ROC sem TTA | Kappa grau |
 |---|---|---|---:|---:|---:|---:|---:|
-| E01 | ref. | B0 448 (campanha de outubro) | 0,671 | — | 0,711 | 0,908 | — |
-| R01 | 1 | B0 512 | | | | | |
-| R02 | 1 | B0 640 | | | | | |
-| R03 | 1 | Destilação B4 448 → B0 448 | | | | | |
+| E01 | ref. | B0 448 (campanha de outubro) | 0,671 | — | 0,711 | 0,908 | 0,804 |
+| R01 | 1 | B0 512 | 0,686 | 0,705 | 0,720 | 0,914 | 0,820 |
+| **R02** | 1 | **B0 640** | **0,732** | 0,723 | 0,714 | **0,923** | 0,818 |
+| R03 | 1 | Destilação B4 448 → B0 448 | 0,609 | 0,605 | 0,686 | 0,904 | 0,809 |
 | R04 | 2 | B0 com pares de olhos, na melhor resolução | | | | | |
 | R05 | 2 | EfficientNetV2-B0, na melhor resolução | | | | | |
 | R06 | 2 | Destilação na melhor resolução, ou progressivo/treino longo | | | | | |
 | R07 | 3 | Combinação das alavancas vencedoras | | | | | |
 | R08–R09 | 3 | R07 com sementes 17 e 73 (mesmo split) | | | | | |
 | R10 | reserva | 768 px ou decisão ordinal | | | | | |
+
+### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
+
+Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
+
+- **R02 (640 px) venceu com folga:** ROC-AUC 0,923 (+0,016 sobre o E01) e
+  especificidade 0,732 sem TTA (+6 pontos). Por olho, ROC-AUC 0,927 (0,931 com
+  TTA4). É o nível da B4 448 com dados extras, numa rede do tamanho da B0. A
+  melhor época foi a última (12 de 12): ainda estava melhorando.
+- **R01 (512 px):** ROC-AUC 0,914 e especificidade 0,686 sem TTA (0,720 com
+  TTA4). Ganho menor, na mesma direção.
+- **R03 (destilação a 448 px) piorou:** especificidade 0,609 sem TTA. O professor
+  foi treinado nas mesmas imagens e dá probabilidades confiantes demais no treino;
+  a destilação sai das próximas levas.
+- **De onde veio o ganho:** com 90% de sensibilidade, a fração de olhos de grau 0
+  marcados como doentes caiu de 34,8% (E01) para 25,5% (R02). A sensibilidade no
+  grau 1 não mudou (72% no E01, 69% no R02); nos graus 2 a 4 ficou em 96–100%.
+- **TTA a 640 px** quase não muda a ROC-AUC (0,923 → 0,926) e a especificidade
+  no ponto de 90% oscila (0,732 sem TTA, 0,714 com TTA4). No celular, a 640 px,
+  TTA deixa de ser obrigatório.
+- **Custo:** a 640 px, cada época levou ~11 min (A100), mais ~1 h para processar
+  as imagens, porque ainda não há cache de 640. O R02 levou cerca de 4 h.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
