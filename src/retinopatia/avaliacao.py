@@ -36,6 +36,7 @@ import tensorflow as tf
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
+    cohen_kappa_score,
     confusion_matrix,
     roc_auc_score,
     roc_curve
@@ -112,21 +113,79 @@ def plotar_historico(historico, nome_fase):
     plt.show()
 
 
+# Variantes da test-time augmentation, na ordem em que são previstas.
+# "tta2" é a média das duas primeiras (original e espelho horizontal) e
+# "tta4" a média das quatro. No celular, cada variante é uma passagem a
+# mais pela rede.
+_VARIANTES_TTA = [
+    lambda x: x,
+    tf.image.flip_left_right,
+    tf.image.flip_up_down,
+    lambda x: tf.image.flip_up_down(tf.image.flip_left_right(x))
+]
+
+MODOS_TTA = {
+    "sem_tta": 1,
+    "tta2": 2,
+    "tta4": 4
+}
+
+
 def _variantes_tta(tta):
     """
     Transformações aplicadas às imagens na test-time augmentation.
     """
 
-    identidade = [lambda x: x]
+    return _VARIANTES_TTA if tta else _VARIANTES_TTA[:1]
 
-    if not tta:
-        return identidade
 
-    return identidade + [
-        tf.image.flip_left_right,
-        tf.image.flip_up_down,
-        lambda x: tf.image.flip_up_down(tf.image.flip_left_right(x))
+def _prever_variante(modelo, dados, transformar):
+    """
+    Probabilidades e graus de uma variante, na ordem do pipeline (que
+    não embaralha). No modelo de pares a entrada é um dicionário com os
+    dois olhos, e a transformação vale para os dois.
+    """
+
+    # O pipeline devolve (imagens, rótulos); só as imagens interessam
+    imagens = dados.map(
+        lambda x, *_, f=transformar: tf.nest.map_structure(f, x)
+    )
+
+    saida = modelo.predict(imagens, verbose=0)
+
+    # Um modelo carregado do disco pode devolver lista em vez de
+    # dicionário; os nomes das saídas dizem a ordem
+    if not isinstance(saida, dict):
+        saida = dict(zip(modelo.output_names, saida))
+
+    return (
+        np.asarray(saida[configuracao.SAIDA_DOENTE]).ravel(),
+        np.asarray(saida[configuracao.SAIDA_GRAU]).ravel()
+    )
+
+
+def prever_variantes(modelo, dados):
+    """
+    Prevê as quatro variantes da TTA uma vez e monta, a partir delas, as
+    predições sem TTA, com TTA de 2 e com TTA de 4 variantes.
+
+    Retorna:
+        {modo: (probabilidades, graus_previstos)}, com os modos de
+        MODOS_TTA
+    """
+
+    variantes = [
+        _prever_variante(modelo, dados, transformar)
+        for transformar in _VARIANTES_TTA
     ]
+
+    return {
+        modo: (
+            np.mean([v[0] for v in variantes[:quantidade]], axis=0),
+            np.mean([v[1] for v in variantes[:quantidade]], axis=0)
+        )
+        for modo, quantidade in MODOS_TTA.items()
+    }
 
 
 def prever_saidas(
@@ -144,30 +203,32 @@ def prever_saidas(
         (probabilidades, graus_previstos)
     """
 
-    probabilidades = []
-    graus = []
+    variantes = [
+        _prever_variante(modelo, dados, transformar)
+        for transformar in _variantes_tta(tta)
+    ]
 
-    for transformar in _variantes_tta(tta):
-        # O pipeline devolve (imagens, rótulos); só as imagens interessam
-        imagens = dados.map(
-            lambda x, *_, f=transformar: f(x)
-        )
+    return (
+        np.mean([v[0] for v in variantes], axis=0),
+        np.mean([v[1] for v in variantes], axis=0)
+    )
 
-        saida = modelo.predict(imagens, verbose=1)
 
-        # Um modelo carregado do disco pode devolver lista em vez de
-        # dicionário; os nomes das saídas dizem a ordem
-        if not isinstance(saida, dict):
-            saida = dict(zip(modelo.output_names, saida))
+def kappa_grau(niveis_reais, graus_previstos):
+    """
+    Kappa quadrático da cabeça de grau (regressão arredondada para o
+    inteiro mais próximo, limitada a 0–4). É a métrica do Kaggle EyePACS
+    2015 (topo: 0,85 no teste da competição), calculada aqui na
+    validação do projeto: serve de referência, não de comparação exata.
+    """
 
-        probabilidades.append(
-            np.asarray(saida[configuracao.SAIDA_DOENTE]).ravel()
-        )
-        graus.append(
-            np.asarray(saida[configuracao.SAIDA_GRAU]).ravel()
-        )
+    previstos = np.clip(np.rint(graus_previstos), 0, 4).astype(int)
 
-    return np.mean(probabilidades, axis=0), np.mean(graus, axis=0)
+    return cohen_kappa_score(
+        np.asarray(niveis_reais).astype(int),
+        previstos,
+        weights="quadratic"
+    )
 
 
 def _agregar(valores, funcao):
@@ -223,14 +284,16 @@ def salvar_predicoes(
     probabilidades,
     graus_previstos,
     nome,
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_resultados=configuracao.PASTA_RESULTADOS,
+    colunas_extras=None
 ):
     """
     Salva a tabela de predições por imagem em
     `pasta_resultados/predicoes_<nome>.csv` e a devolve.
 
     Colunas: image, patient_id, level_original, target,
-    prob_doente, grau_previsto.
+    prob_doente, grau_previsto e as de `colunas_extras` (por exemplo, as
+    predições de cada modo de TTA).
     """
 
     tabela = df[
@@ -239,6 +302,9 @@ def salvar_predicoes(
 
     tabela["prob_doente"] = probabilidades
     tabela["grau_previsto"] = graus_previstos
+
+    for coluna, valores in (colunas_extras or {}).items():
+        tabela[coluna] = valores
 
     os.makedirs(
         pasta_resultados,
@@ -447,7 +513,8 @@ def avaliar_modelo(
     historico,
     nome_fase,
     sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA,
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_resultados=configuracao.PASTA_RESULTADOS,
+    tta=configuracao.TTA_ATIVO
 ):
     """
     Executa a avaliação completa de uma fase de treino na validação:
@@ -455,7 +522,13 @@ def avaliar_modelo(
     limiares (por olho e por paciente), matrizes de confusão e
     relatórios. As predições são salvas em CSV em `pasta_resultados`.
 
-    Retorna um dicionário com os limiares escolhidos, as métricas e as
+    As quatro variantes da TTA são previstas uma vez: a avaliação
+    principal usa TTA de 4 (ou nenhuma, com `tta=False`), e uma tabela
+    compara sem TTA, TTA de 2 e TTA de 4 por paciente. O CSV guarda as
+    predições dos três modos.
+
+    Retorna um dicionário com os limiares escolhidos, as métricas, o
+    kappa da cabeça de grau, a comparação dos modos de TTA e as
     predições da validação (vetor e tabela por imagem). Os limiares são
     reutilizados por `avaliar_no_teste`.
     """
@@ -467,14 +540,36 @@ def avaliar_modelo(
     # 2. PROBABILIDADES NA VALIDAÇÃO
     print("\nGerando probabilidades na validação...")
 
-    predicoes, graus_previstos = prever_saidas(modelo, val_data)
+    variantes = prever_variantes(modelo, val_data)
+
+    predicoes, graus_previstos = variantes["tta4" if tta else "sem_tta"]
+
+    colunas_extras = {}
+
+    for modo, (probabilidades_modo, graus_modo) in variantes.items():
+        colunas_extras[f"prob_doente_{modo}"] = probabilidades_modo
+        colunas_extras[f"grau_previsto_{modo}"] = graus_modo
 
     tabela = salvar_predicoes(
         df_val,
         predicoes,
         graus_previstos,
         f"validacao_{_nome_arquivo(nome_fase)}",
-        pasta_resultados
+        pasta_resultados,
+        colunas_extras
+    )
+
+    comparacao_tta = comparar_modos_tta(
+        df_val,
+        variantes,
+        sensibilidade_desejada
+    )
+
+    kappa = kappa_grau(df_val["level_original"], graus_previstos)
+
+    print(
+        f"\nKappa quadrático da cabeça de grau (validação): {kappa:.4f} "
+        "(Kaggle 2015, topo: 0,85 no teste da competição)"
     )
 
     classes_olho = df_val["target"].astype(int).values
@@ -502,8 +597,8 @@ def avaliar_modelo(
     # 4. MATRIZES E RELATÓRIOS
     print(
         "\nAtenção: os limiares foram escolhidos nesta validação, "
-        "então estes números são otimistas. Use o teste para a "
-        "estimativa final."
+        "então estes números são otimistas. Compare os experimentos por "
+        "eles; o teste mede só o modelo final escolhido."
     )
 
     metricas_olho = relatar_desempenho(
@@ -525,9 +620,60 @@ def avaliar_modelo(
         "limiar_paciente": limiar_paciente,
         "metricas_olho": metricas_olho,
         "metricas_paciente": metricas_paciente,
+        "kappa_grau": kappa,
+        "comparacao_tta": comparacao_tta,
         "predicoes": predicoes,
         "tabela": tabela
     }
+
+
+def comparar_modos_tta(
+    df,
+    variantes,
+    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+):
+    """
+    Compara, por paciente, as predições sem TTA, com TTA de 2 e de 4
+    variantes: ROC-AUC, AP e especificidade no limiar que dá a
+    sensibilidade desejada (escolhido em cada modo). Um limiar escolhido
+    com TTA não vale para a inferência sem TTA, e vice-versa.
+
+    Retorna um DataFrame com uma linha por modo.
+    """
+
+    linhas = []
+
+    for modo, (probabilidades, _) in variantes.items():
+        classes, probabilidades_paciente = agregar_por_paciente(
+            df,
+            probabilidades
+        )
+
+        limiar, sensibilidade, especificidade = escolher_limiar(
+            classes,
+            probabilidades_paciente,
+            sensibilidade_desejada
+        )
+
+        linhas.append({
+            "modo": modo,
+            "passagens": MODOS_TTA[modo],
+            "roc_auc": roc_auc_score(classes, probabilidades_paciente),
+            "pr_auc": average_precision_score(
+                classes,
+                probabilidades_paciente
+            ),
+            "sensibilidade": sensibilidade,
+            "especificidade": especificidade,
+            "limiar": limiar
+        })
+
+    tabela = pd.DataFrame(linhas).set_index("modo")
+
+    print("\nModos de TTA, validação por paciente:")
+    print(tabela.round(4).to_string())
+
+    return tabela
 
 
 def avaliar_no_teste(
@@ -536,7 +682,8 @@ def avaliar_no_teste(
     df_teste,
     resultado_validacao,
     nome="Teste",
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_resultados=configuracao.PASTA_RESULTADOS,
+    liberado=configuracao.AVALIAR_TESTE
 ):
     """
     Avalia o modelo no conjunto de teste usando os limiares escolhidos
@@ -544,9 +691,20 @@ def avaliar_no_teste(
     honesta do desempenho do modelo. As predições são salvas em CSV em
     `pasta_resultados`.
 
+    Só roda com `liberado=True` (RETINOPATIA_AVALIAR_TESTE=1, modelo
+    final). Nos experimentos devolve None sem tocar no teste.
+
     Retorna um dicionário com as métricas por olho e por paciente e as
     predições do teste (vetor e tabela por imagem).
     """
+
+    if not liberado:
+        print(
+            "Teste fechado: os experimentos são comparados na validação. "
+            "Para o modelo final, RETINOPATIA_AVALIAR_TESTE=1 na primeira "
+            "célula."
+        )
+        return None
 
     print("\nGerando probabilidades no teste...")
 
@@ -589,13 +747,19 @@ def avaliar_no_teste(
 
 def registrar_experimento(
     resultado_validacao,
-    resultado_teste,
-    caminho_registro=configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
+    resultado_teste=None,
+    pasta_resultados=configuracao.PASTA_RESULTADOS
 ):
     """
-    Acrescenta uma linha ao registro de experimentos no Drive: commit
-    do código, configuração principal, limiares e as métricas de
-    validação e de teste por olho e por paciente.
+    Grava o resumo desta execução em `pasta_resultados/resumo.csv`:
+    experimento, commit, configuração principal, limiares, métricas de
+    validação por olho e por paciente, kappa da cabeça de grau e a
+    especificidade de cada modo de TTA. As métricas de teste só entram
+    quando `resultado_teste` é passado (modelo final).
+
+    A tabela geral é montada depois por `consolidar_experimentos`: cada
+    sessão grava só o próprio resumo, e sessões em paralelo não perdem
+    linhas.
 
     Para escolher entre experimentos, compare as colunas de validação;
     as de teste só valem para o modelo final escolhido.
@@ -604,20 +768,29 @@ def registrar_experimento(
     linha = {
         "data": pd.Timestamp.now().isoformat(timespec="seconds"),
         "experimento": configuracao.NOME_EXPERIMENTO,
+        "nome_experimento": configuracao.EXPERIMENTO,
         "modelo": configuracao.NOME_MODELO,
         "commit": configuracao.COMMIT_CODIGO,
         "backbone": configuracao.BACKBONE,
         "tamanho_imagem": configuracao.TAMANHO_IMAGEM[0],
         "pre_processamento": configuracao.VERSAO_PRE_PROCESSAMENTO,
         "tamanho_lote": configuracao.TAMANHO_LOTE,
+        "seed_treino": configuracao.SEED_TREINO,
+        "modelo_pares": configuracao.MODELO_PARES,
+        "destilacao": configuracao.DESTILACAO,
+        "fumaca": configuracao.FUMACA,
         "limiar_olho": resultado_validacao["limiar_olho"],
-        "limiar_paciente": resultado_validacao["limiar_paciente"]
+        "limiar_paciente": resultado_validacao["limiar_paciente"],
+        "val_kappa_grau": round(float(resultado_validacao["kappa_grau"]), 4)
     }
 
     for conjunto, resultado in (
         ("val", resultado_validacao),
         ("teste", resultado_teste)
     ):
+        if resultado is None:
+            continue
+
         for nivel in ("olho", "paciente"):
             metricas = resultado[f"metricas_{nivel}"]
 
@@ -627,21 +800,81 @@ def registrar_experimento(
                     4
                 )
 
+    for modo, metricas in resultado_validacao["comparacao_tta"].iterrows():
+        for nome in ("roc_auc", "especificidade"):
+            valor = metricas[nome]
+            linha[f"val_paciente_{nome}_{modo}"] = (
+                None if pd.isna(valor) else round(float(valor), 4)
+            )
+
     os.makedirs(
-        os.path.dirname(caminho_registro),
+        pasta_resultados,
         exist_ok=True
     )
 
-    registro = pd.DataFrame([linha])
+    caminho = os.path.join(pasta_resultados, "resumo.csv")
+
+    resumo = pd.DataFrame([linha])
+    resumo.to_csv(caminho, index=False)
+
+    print(f"Resumo do experimento salvo em: {caminho}")
+
+    return resumo
+
+
+def consolidar_experimentos(
+    pasta_resultados_geral=configuracao.PASTA_RESULTADOS_GERAL,
+    caminho_registro=configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
+):
+    """
+    Atualiza o registro geral de experimentos com os `resumo.csv` de
+    todas as pastas de resultados. Chame em uma sessão só, depois que os
+    treinos paralelos terminarem.
+
+    As linhas antigas do registro (treinos de antes dos resumos por
+    execução) são preservadas; uma execução que aparece de novo fica com
+    a versão do seu resumo.
+
+    Retorna o registro consolidado.
+    """
+
+    tabelas = []
 
     if os.path.isfile(caminho_registro):
-        registro = pd.concat(
-            [pd.read_csv(caminho_registro), registro],
-            ignore_index=True
+        tabelas.append(pd.read_csv(caminho_registro))
+
+    for nome in sorted(os.listdir(pasta_resultados_geral)):
+        caminho_resumo = os.path.join(
+            pasta_resultados_geral,
+            nome,
+            "resumo.csv"
         )
 
-    registro.to_csv(caminho_registro, index=False)
+        if os.path.isfile(caminho_resumo):
+            tabelas.append(pd.read_csv(caminho_resumo))
 
-    print(f"Experimento registrado em: {caminho_registro}")
+    if not tabelas:
+        print("Nenhum resumo encontrado.")
+        return pd.DataFrame()
+
+    registro = pd.concat(tabelas, ignore_index=True).drop_duplicates(
+        subset="experimento",
+        keep="last"
+    )
+
+    # Execuções de fumaça só conferem o código; não entram no registro
+    if "fumaca" in registro:
+        registro = registro[
+            ~registro["fumaca"].astype(str).str.lower().eq("true")
+        ]
+
+    temporario = caminho_registro + ".parcial"
+    registro.to_csv(temporario, index=False)
+    os.replace(temporario, caminho_registro)
+
+    print(
+        f"Registro consolidado ({len(registro)} execuções): "
+        f"{caminho_registro}"
+    )
 
     return registro
