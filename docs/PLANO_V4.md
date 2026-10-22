@@ -49,9 +49,9 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R01 | 1 | B0 512 | 0,686 | 0,705 | 0,720 | 0,914 | 0,820 |
 | **R02** | 1 | **B0 640** | **0,732** | 0,723 | 0,714 | **0,923** | 0,818 |
 | R03 | 1 | Destilação B4 448 → B0 448 | 0,609 | 0,605 | 0,686 | 0,904 | 0,809 |
-| R04 | 2 | B0 com pares de olhos, na melhor resolução | | | | | |
-| R05 | 2 | EfficientNetV2-B0, na melhor resolução | | | | | |
-| R06 | 2 | Destilação na melhor resolução, ou progressivo/treino longo | | | | | |
+| R04 | 2 | B0 com pares de olhos, 640 px (só se o combinador mostrar ganho) | | | | | |
+| R05 | 2 | EfficientNetV2-B0, 640 px | | | | | |
+| R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | | | | | |
 | R07 | 3 | Combinação das alavancas vencedoras | | | | | |
 | R08–R09 | 3 | R07 com sementes 17 e 73 (mesmo split) | | | | | |
 | R10 | reserva | 768 px ou decisão ordinal | | | | | |
