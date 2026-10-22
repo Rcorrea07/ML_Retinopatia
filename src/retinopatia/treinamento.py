@@ -18,6 +18,10 @@ a uma desconexão do Colab.
 O desbalanceamento entre as classes é compensado com pesos por amostra
 (`sample_weight`) acrescentados ao pipeline de treino: o argumento
 `class_weight` do Keras não funciona em modelos com mais de uma saída.
+
+Também ficam aqui os alvos do professor da destilação
+(`gerar_alvos_professor`) e o início a partir de um modelo treinado em
+resolução menor (`configuracao.PESOS_INICIAIS`, que pula a Fase 1).
 """
 
 import os
@@ -34,7 +38,7 @@ from tensorflow.keras.callbacks import (
 )
 
 from . import configuracao
-from .modelo import compilar_modelo
+from .modelo import carregar_modelo_salvo, compilar_modelo
 
 
 def calcular_pesos_classe(df_treino):
@@ -276,8 +280,20 @@ def treinar_fase1(
     Treina apenas as cabeças da rede e recarrega o melhor checkpoint ao
     final, deixando o modelo pronto para a avaliação.
 
+    Com `configuracao.PESOS_INICIAIS` (redimensionamento progressivo),
+    não treina: copia os pesos do modelo anterior, grava-os como o
+    checkpoint da Fase 1 e devolve None. A Fase 2 parte deles.
+
     Retorna o histórico do treino.
     """
+
+    if configuracao.PESOS_INICIAIS:
+        iniciar_de_modelo_anterior(
+            modelo,
+            configuracao.PESOS_INICIAIS,
+            caminho_pesos
+        )
+        return None
 
     print("Iniciando o treinamento...")
 
@@ -286,7 +302,10 @@ def treinar_fase1(
         adicionar_pesos_amostra(treino_data, pesos_dicionario),
         validation_data=val_data,
         epochs=epocas,
-        callbacks=callbacks
+        callbacks=callbacks,
+        # Uma linha por época: a barra por lote deixava o log com 20 MB e
+        # travava a aba do navegador
+        verbose=2
     )
 
     print("\n Treino da Fase 1 concluído com sucesso!")
@@ -348,7 +367,8 @@ def fine_tuning_fase2(
         adicionar_pesos_amostra(treino_data, pesos_dicionario),
         validation_data=val_data,
         epochs=epocas,
-        callbacks=callbacks
+        callbacks=callbacks,
+        verbose=2
     )
 
     print("Carregando o melhor checkpoint da Fase 2 para avaliação...")
@@ -356,3 +376,223 @@ def fine_tuning_fase2(
     modelo.load_weights(caminho_pesos_fase2)
 
     return historico_fase2
+
+
+def iniciar_de_modelo_anterior(
+    modelo,
+    caminho_modelo,
+    caminho_pesos_fase1=configuracao.CAMINHO_PESOS_FASE1
+):
+    """
+    Copia para `modelo` os pesos de um modelo .keras já treinado, com a
+    mesma arquitetura e outro tamanho de imagem (os pesos de convolução
+    não dependem do tamanho), e grava-os como o checkpoint da Fase 1.
+    """
+
+    print(f"Iniciando com os pesos de {caminho_modelo}...")
+
+    anterior = carregar_modelo_salvo(caminho_modelo)
+
+    pesos = anterior.get_weights()
+
+    if [p.shape for p in pesos] != [p.shape for p in modelo.get_weights()]:
+        raise ValueError(
+            "O modelo anterior não tem a mesma arquitetura (rede, cabeças, "
+            "modelo de pares ou destilação) do modelo atual."
+        )
+
+    modelo.set_weights(pesos)
+
+    os.makedirs(
+        os.path.dirname(caminho_pesos_fase1),
+        exist_ok=True
+    )
+
+    modelo.save_weights(caminho_pesos_fase1)
+
+    del anterior
+    print("Fase 1 pulada: a Fase 2 parte dos pesos do modelo anterior.")
+
+
+def gerar_alvos_professor(
+    df_treino,
+    caminho_professor=configuracao.CAMINHO_PROFESSOR,
+    tamanho_imagem=configuracao.TAMANHO_IMAGEM_PROFESSOR,
+    pasta_imagens=configuracao.PASTA_IMAGENS_PROFESSOR,
+    pasta_dados_internos=configuracao.PASTA_DADOS_INTERNOS,
+    pasta_resultados=configuracao.PASTA_RESULTADOS
+):
+    """
+    Acrescenta ao treino a coluna `prob_professor`: a probabilidade de
+    retinopatia dada pelo professor (B4 448 com dados extras) a cada
+    imagem, sem TTA e sem augmentation. Só o treino é usado; validação e
+    teste nunca passam pelo professor.
+
+    O professor lê as imagens do cache v3 de 448, o tamanho em que foi
+    treinado, mesmo quando o aluno usa outra resolução (o cache de 448
+    é restaurado se ainda não estiver no disco).
+
+    As probabilidades dependem só do professor e das imagens: ficam
+    guardadas em `dados_internos` e são reaproveitadas pelos próximos
+    treinos com destilação. Uma cópia vai para a pasta do experimento.
+
+    Observação: o professor foi treinado nessas mesmas imagens, então
+    as probabilidades dele no treino são mais confiantes do que seriam
+    em imagens novas.
+    """
+
+    import pandas as pd
+
+    from . import ambiente_colab, pipeline_dados
+
+    nome_professor = os.path.splitext(os.path.basename(caminho_professor))[0]
+
+    caminho_alvos = os.path.join(
+        pasta_dados_internos,
+        f"alvos_professor_{nome_professor}.csv"
+    )
+
+    alvos = (
+        pd.read_csv(caminho_alvos)
+        if os.path.isfile(caminho_alvos)
+        else pd.DataFrame(columns=["image", "prob_professor"])
+    )
+
+    faltando = df_treino[~df_treino["image"].isin(alvos["image"])]
+
+    if len(faltando):
+        print(
+            f"Gerando as probabilidades do professor para {len(faltando)} "
+            "imagens do treino..."
+        )
+
+        # Imagens do professor: cache v3 de 448 (train e extras)
+        def zip_legado(pasta):
+            return [os.path.join(
+                configuracao.PASTA_CACHE_DRIVE,
+                os.path.basename(pasta) + ".zip"
+            )]
+
+        ambiente_colab.restaurar_cache_imagens(
+            pasta_imagens,
+            zip_legado(pasta_imagens)
+        )
+
+        imagens = faltando.copy()
+
+        if "pasta_processada" in imagens:
+            extras = imagens["pasta_processada"].str.endswith("_extra")
+
+            if extras.any():
+                ambiente_colab.restaurar_cache_imagens(
+                    pasta_imagens + "_extra",
+                    zip_legado(pasta_imagens + "_extra")
+                )
+
+            imagens["pasta_processada"] = np.where(
+                extras,
+                pasta_imagens + "_extra",
+                pasta_imagens
+            )
+
+        professor = carregar_modelo_salvo(caminho_professor)
+
+        dados = pipeline_dados.criar_dataset(
+            imagens,
+            treino=False,
+            pasta_imagens=pasta_imagens,
+            tamanho_imagem=tamanho_imagem,
+            pares=False
+        )
+
+        saida = professor.predict(
+            dados.map(lambda x, *_: x),
+            verbose=0
+        )
+
+        if not isinstance(saida, dict):
+            saida = dict(zip(professor.output_names, saida))
+
+        probabilidades = np.asarray(saida[configuracao.SAIDA_DOENTE]).ravel()
+
+        if not np.all(np.isfinite(probabilidades)):
+            raise ValueError("O professor gerou probabilidades inválidas.")
+
+        alvos = pd.concat(
+            [alvos, pd.DataFrame({
+                "image": imagens["image"].values,
+                "prob_professor": probabilidades
+            })],
+            ignore_index=True
+        )
+
+        os.makedirs(pasta_dados_internos, exist_ok=True)
+        alvos.to_csv(caminho_alvos + ".parcial", index=False)
+        os.replace(caminho_alvos + ".parcial", caminho_alvos)
+
+        del professor
+        tf.keras.backend.clear_session()
+
+        # clear_session pode desfazer as sementes e a precisão mista
+        # configuradas no início do notebook
+        from . import utilitarios
+
+        utilitarios.configurar_sementes(configuracao.SEED)
+        utilitarios.configurar_precisao_mista()
+
+    resultado = df_treino.merge(
+        alvos[["image", "prob_professor"]],
+        on="image",
+        how="left",
+        validate="one_to_one"
+    )
+
+    os.makedirs(pasta_resultados, exist_ok=True)
+    resultado[["image", "target", "prob_professor"]].to_csv(
+        os.path.join(pasta_resultados, "alvos_professor_treino.csv"),
+        index=False
+    )
+
+    print(
+        "Probabilidade média do professor: "
+        f"{resultado['prob_professor'].mean():.3f} "
+        f"(fração de doentes no treino: {resultado['target'].mean():.3f})"
+    )
+
+    return resultado
+
+
+def preparar_conjuntos_experimento(df_treino, df_val, df_teste):
+    """
+    Ajusta os conjuntos ao experimento ativo, depois de prontos os dados
+    (inclusive as imagens extras):
+
+    - fumaça: reduz a poucos pacientes (`conjunto_dados.reduzir_para_fumaca`);
+    - modelo de pares: acrescenta o outro olho de cada linha
+      (`conjunto_dados.adicionar_par`);
+    - destilação: acrescenta ao treino a probabilidade do professor
+      (`gerar_alvos_professor`). Precisa vir antes de construir o
+      modelo, porque libera a memória do professor com clear_session.
+
+    Retorna:
+        (df_treino, df_val, df_teste)
+    """
+
+    from . import conjunto_dados
+
+    df_treino, df_val, df_teste = conjunto_dados.reduzir_para_fumaca(
+        df_treino,
+        df_val,
+        df_teste
+    )
+
+    if configuracao.MODELO_PARES:
+        df_treino, df_val, df_teste = (
+            conjunto_dados.adicionar_par(df)
+            for df in (df_treino, df_val, df_teste)
+        )
+
+    if configuracao.DESTILACAO:
+        df_treino = gerar_alvos_professor(df_treino)
+
+    return df_treino, df_val, df_teste
