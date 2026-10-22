@@ -78,6 +78,19 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
 - **Custo:** a 640 px, cada época levou ~11 min (A100), mais ~1 h para processar
   as imagens, porque ainda não há cache de 640. O R02 levou cerca de 4 h.
 
+### Antes da leva 2
+
+- **Combinar os dois olhos depois do treino não ajudou.** Uma regressão
+  logística sobre os dois olhos (probabilidades e graus), em validação cruzada
+  por paciente, deu especificidade 0,737 no R02 contra 0,732 da regra do máximo
+  (ROC 0,922 contra 0,923); no E01, 0,660 contra 0,671. Misturar as cabeças
+  `doente` e `grau` também empatou (0,736). O R04 (pares de olhos, cerca de o
+  dobro do custo) fica de fora enquanto o orçamento de GPU estiver curto.
+- **O cache de 640 no Drive pessoal não foi possível.** O Colab da conta do
+  projeto recusa montar o Drive de outra conta ("mount failed"), e o Colab
+  gratuito da conta pessoal não tem disco para extrair o dataset bruto (~105 GB).
+  R05 e R06 processam as imagens de 640 na própria sessão (cerca de 1 h a mais).
+
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
 finalistas são repetidos com outras sementes antes da decisão.
