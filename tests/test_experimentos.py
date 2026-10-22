@@ -126,7 +126,7 @@ class EscolhaDeExperimento(unittest.TestCase):
         )
 
     def test_fumaca_usa_uma_epoca_e_pasta_propria(self):
-        c = resolver("R04_b0_pares", RETINOPATIA_FUMACA="1")
+        c = resolver("R04_b0_pares_640", RETINOPATIA_FUMACA="1")
 
         self.assertEqual(c["epocas"], [1, 1])
         self.assertTrue(c["resultados"].endswith("_fumaca"))
