@@ -1,5 +1,7 @@
 # Planejamento das próximas etapas
 
+> Histórico de 07/10/2026. O plano atual é o [plano v4](PLANO_V4.md).
+
 Atualizado em 07/10/2026, depois dos treinos v3 (B4 e B0, commit `1ccd2cb`).
 Base: relatórios de 06/10 (treino v2 de 10 h) e 07/10 (B4 × B0), contexto do
 PWA (`contexto_codex_retinopatia_pwa.txt`) e registro da integração do modelo
