@@ -16,7 +16,18 @@ pooling e de duas cabeças:
 
 Na Fase 1 a rede base fica congelada; o descongelamento acontece no
 fine-tuning (ver `treinamento.fine_tuning_fase2`).
+
+Com `configuracao.MODELO_PARES`, a mesma rede (pesos compartilhados) vê
+os dois olhos do paciente e cada olho é previsto a partir das
+características dele e das do outro olho, como nas soluções de 2015 de
+Jeffrey De Fauw e do time o_O. As saídas continuam por olho.
+
+Com `configuracao.DESTILACAO`, uma terceira saída, `professor`, repete a
+probabilidade de `doente` para ser comparada com a probabilidade do
+professor (B4). Ela não muda a inferência.
 """
+
+import os
 
 import tensorflow as tf
 from tensorflow.keras import applications, layers, models
@@ -29,8 +40,15 @@ BACKBONES = {
     "EfficientNetB3": applications.EfficientNetB3,
     "EfficientNetB4": applications.EfficientNetB4,
     "EfficientNetB5": applications.EfficientNetB5,
+    # Leve como a B0 (cerca de 7 milhões de parâmetros) e mais precisa na
+    # ImageNet. Faz o próprio pré-processamento: a entrada fica em 0–255.
+    "EfficientNetV2B0": applications.EfficientNetV2B0,
     "EfficientNetV2S": applications.EfficientNetV2S
 }
+
+# Nomes das entradas do modelo de pares (dicionário do pipeline)
+ENTRADA_OLHO = "olho"
+ENTRADA_OUTRO_OLHO = "outro_olho"
 
 
 class GeM(layers.Layer):
@@ -125,20 +143,35 @@ def compilar_modelo(
     (a Fase 2 usa cosseno com aquecimento).
     """
 
+    perdas = {
+        configuracao.SAIDA_DOENTE: tf.keras.losses.BinaryCrossentropy(),
+        configuracao.SAIDA_GRAU: tf.keras.losses.Huber(
+            delta=delta_huber
+        )
+    }
+
+    pesos_perdas = {
+        configuracao.SAIDA_DOENTE: 1.0,
+        configuracao.SAIDA_GRAU: peso_perda_grau
+    }
+
+    # Destilação: a perda binária se divide entre o rótulo real e a
+    # probabilidade do professor (entropia cruzada com alvo contínuo)
+    if configuracao.DESTILACAO:
+        perdas[configuracao.SAIDA_PROFESSOR] = (
+            tf.keras.losses.BinaryCrossentropy()
+        )
+        pesos_perdas[configuracao.SAIDA_DOENTE] = configuracao.PESO_ROTULO_REAL
+        pesos_perdas[configuracao.SAIDA_PROFESSOR] = (
+            1.0 - configuracao.PESO_ROTULO_REAL
+        )
+
     modelo.compile(
         optimizer=tf.keras.optimizers.Adam(
             learning_rate=taxa_aprendizado
         ),
-        loss={
-            configuracao.SAIDA_DOENTE: tf.keras.losses.BinaryCrossentropy(),
-            configuracao.SAIDA_GRAU: tf.keras.losses.Huber(
-                delta=delta_huber
-            )
-        },
-        loss_weights={
-            configuracao.SAIDA_DOENTE: 1.0,
-            configuracao.SAIDA_GRAU: peso_perda_grau
-        },
+        loss=perdas,
+        loss_weights=pesos_perdas,
         metrics={
             configuracao.SAIDA_DOENTE: criar_metricas(),
             configuracao.SAIDA_GRAU: [
@@ -149,14 +182,42 @@ def compilar_modelo(
     )
 
 
+def _criar_extrator(modelo_base, formato_entrada):
+    """
+    Augmentation (ativo só no treino), rede base e GeM: transforma uma
+    imagem no vetor de características usado pelas cabeças.
+    """
+
+    entrada = layers.Input(
+        shape=formato_entrada,
+        name="imagem"
+    )
+
+    # Ativo só no treino; no predict a imagem passa intacta
+    x = criar_aumento_dados()(entrada)
+
+    # training=False mantém a BatchNormalization da rede base em modo
+    # de inferência mesmo depois do descongelamento no fine-tuning
+    x = modelo_base(x, training=False)
+
+    caracteristicas = GeM(name="gem")(x)
+
+    return models.Model(entrada, caracteristicas, name="extrator")
+
+
 def construir_modelo(
     formato_entrada=configuracao.FORMATO_ENTRADA,
     nome_backbone=configuracao.BACKBONE,
     taxa_aprendizado=configuracao.TAXA_APRENDIZADO_FASE1,
-    mostrar_resumo=True
+    mostrar_resumo=True,
+    pares=configuracao.MODELO_PARES
 ):
     """
     Monta e compila o modelo da Fase 1, com a rede base congelada.
+
+    Com `pares=True`, o modelo recebe um dicionário com as imagens
+    `olho` e `outro_olho` (o outro olho do mesmo paciente) e prevê o
+    `olho`; o mesmo extrator processa as duas imagens.
 
     Retorna:
         (modelo, modelo_base)
@@ -183,19 +244,32 @@ def construir_modelo(
     # Fase 1: congela a rede base e treina apenas as cabeças
     modelo_base.trainable = False
 
-    entrada = layers.Input(
-        shape=formato_entrada,
-        name="imagem"
-    )
+    extrator = _criar_extrator(modelo_base, formato_entrada)
 
-    # Ativo só no treino; no predict a imagem passa intacta
-    x = criar_aumento_dados()(entrada)
+    if pares:
+        entradas = {
+            ENTRADA_OLHO: layers.Input(
+                shape=formato_entrada,
+                name=ENTRADA_OLHO
+            ),
+            ENTRADA_OUTRO_OLHO: layers.Input(
+                shape=formato_entrada,
+                name=ENTRADA_OUTRO_OLHO
+            )
+        }
 
-    # training=False mantém a BatchNormalization da rede base em modo
-    # de inferência mesmo depois do descongelamento no fine-tuning
-    x = modelo_base(x, training=False)
+        x = layers.Concatenate(name="olho_e_outro_olho")([
+            extrator(entradas[ENTRADA_OLHO]),
+            extrator(entradas[ENTRADA_OUTRO_OLHO])
+        ])
 
-    x = GeM(name="gem")(x)
+    else:
+        entradas = layers.Input(
+            shape=formato_entrada,
+            name="imagem"
+        )
+
+        x = extrator(entradas)
 
     x = layers.Dropout(
         configuracao.TAXA_DROPOUT,
@@ -217,12 +291,22 @@ def construir_modelo(
         name=configuracao.SAIDA_GRAU
     )(x)
 
+    saidas = {
+        configuracao.SAIDA_DOENTE: doente,
+        configuracao.SAIDA_GRAU: grau
+    }
+
+    if configuracao.DESTILACAO:
+        # Mesma probabilidade de `doente`, com outro alvo (o professor)
+        saidas[configuracao.SAIDA_PROFESSOR] = layers.Activation(
+            "linear",
+            dtype="float32",
+            name=configuracao.SAIDA_PROFESSOR
+        )(doente)
+
     modelo = models.Model(
-        inputs=entrada,
-        outputs={
-            configuracao.SAIDA_DOENTE: doente,
-            configuracao.SAIDA_GRAU: grau
-        },
+        inputs=entradas,
+        outputs=saidas,
         name="retinopatia"
     )
 
@@ -234,3 +318,54 @@ def construir_modelo(
     print("Arquitetura montada com sucesso!")
 
     return modelo, modelo_base
+
+
+def carregar_modelo_salvo(caminho):
+    """
+    Carrega um modelo .keras salvo pelo projeto (sem recompilar).
+    """
+
+    return tf.keras.models.load_model(
+        caminho,
+        custom_objects={"GeM": GeM},
+        compile=False
+    )
+
+
+def salvar_modelo_final(
+    modelo,
+    dados,
+    caminho=configuracao.CAMINHO_MODELO_FINAL
+):
+    """
+    Salva o modelo completo (arquitetura + pesos) e confere a gravação:
+    recarrega o arquivo e compara as saídas com as do modelo em memória
+    num lote de `dados`. Um erro de serialização (por exemplo, da camada
+    GeM ou do modelo de pares) aparece aqui, e não meses depois na API.
+    """
+
+    import numpy as np
+
+    os.makedirs(
+        os.path.dirname(caminho),
+        exist_ok=True
+    )
+
+    modelo.save(caminho)
+
+    recarregado = carregar_modelo_salvo(caminho)
+
+    entrada = next(iter(dados))[0]
+
+    antes = modelo(entrada, training=False)
+    depois = recarregado(entrada, training=False)
+
+    for nome in antes:
+        np.testing.assert_allclose(
+            np.asarray(antes[nome]),
+            np.asarray(depois[nome]),
+            rtol=1e-4,
+            atol=1e-5
+        )
+
+    print(f"Modelo salvo e conferido (recarga idêntica): {caminho}")
