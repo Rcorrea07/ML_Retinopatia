@@ -14,14 +14,22 @@ regressão:
 
 ## Como executar
 
-O projeto é **executado no Google Colab** (por causa da GPU; a configuração padrão,
-EfficientNetB4 em 448×448, foi pensada para L4 ou A100) e **editado localmente**
-no VS Code. O código Python vive neste repositório e é trazido para o Colab por
-`git clone`/`git pull`.
+O projeto é **executado no Google Colab** (GPU A100 com RAM alta) e **editado
+localmente** no VS Code. O código Python vive neste repositório e é trazido para o
+Colab por `git clone`/`git pull`.
 
-1. Abra `notebooks/Retinopatia_0_1.ipynb` no Google Colab.
-2. Ative uma GPU: *Ambiente de execução → Alterar o tipo de ambiente de execução → GPU*.
+1. Abra `notebooks/Retinopatia_0_1.ipynb` no Google Colab (ele já pede A100 com RAM alta).
+2. Na primeira célula, escolha o experimento (`EXPERIMENTO`, lista em
+   `src/retinopatia/experimentos.py`).
 3. Execute as células de cima para baixo.
+
+Um experimento por sessão. Para rodar vários em paralelo, use uma cópia do
+notebook por sessão, mudando só `EXPERIMENTO`. O passo a passo das rodadas, com a
+tabela de resultados, está em [`docs/PLANO_V4.md`](docs/PLANO_V4.md); as fontes, em
+[`docs/REFERENCIAS.md`](docs/REFERENCIAS.md).
+
+Os experimentos são comparados só na validação. O teste fica fechado até o modelo
+final (`RETINOPATIA_AVALIAR_TESTE = "1"` na primeira célula).
 
 A primeira célula clona (ou atualiza) este repositório dentro do Colab e coloca
 `src/` no `sys.path`, tornando o pacote `retinopatia` importável. O `autoreload`
@@ -40,9 +48,14 @@ serve apenas como documentação das bibliotecas usadas no Colab.
 ## Estrutura
 
 ```
+├── docs/                       # plano v4, referências e planejamento anterior
 ├── notebooks/
-│   └── Retinopatia_0_1.ipynb   # orquestra a execução no Colab
+│   ├── Retinopatia_0_1.ipynb   # treino: orquestra a execução no Colab
+│   ├── Preparar_Caches.ipynb   # caches de imagens (conta pessoal), uma vez por tamanho
+│   └── Analisar_Resultados.ipynb  # comparação das execuções salvas (só CPU)
+├── tests/                      # testes sem TensorFlow
 └── src/retinopatia/
+    ├── experimentos.py         # experimentos nomeados (o que cada um muda)
     ├── configuracao.py         # sementes, caminhos e hiperparâmetros
     ├── utilitarios.py          # sementes, determinismo e precisão mista
     ├── ambiente_colab.py       # Drive, extração do dataset e download
@@ -52,22 +65,29 @@ serve apenas como documentação das bibliotecas usadas no Colab.
     ├── modelo.py               # EfficientNet + GeM + cabeças binária e de grau
     ├── treinamento.py          # pesos de classe, callbacks e as duas fases
     ├── avaliacao.py            # curvas, limiar, TTA, avaliação por olho e paciente
-    └── diagnostico.py          # erros por grau, grau ≥ 2, agregação e bootstrap
+    ├── diagnostico.py          # erros por grau, grau ≥ 2, agregação e bootstrap
+    └── analise.py              # análises das predições salvas, sem TensorFlow
 ```
 
 ## Organização no Google Drive
 
 ```
 MyDrive/ProjetoRetinopatia/
-├── modelos/          # modelos finais (.keras), ex.: B4_448_v3_1ccd2cb.keras
-├── resultados/       # uma pasta por treino + registro_experimentos.csv
+├── modelos/          # modelos finais (.keras), um por execução
+├── resultados/       # uma pasta por execução (resumo.csv, predições, históricos…)
+│                     # + registro_experimentos.csv (consolidado)
 ├── relatorios/       # relatórios em PDF
 ├── notebooks/        # cópias dos notebooks executados, com as saídas
-└── dados_internos/   # splits (mesma divisão para todos os treinos) e cache das imagens
+└── dados_internos/   # splits (mesma divisão para todos os treinos), caches de 448
+                      # e probabilidades do professor da destilação
+
+MyDrive/ProjetoRetinopatia_caches/   # atalho para a pasta da conta pessoal:
+                                     # caches de 512 px ou mais
 ```
 
-O nome do modelo junta rede, tamanho da imagem, versão do pré-processamento e
-commit do código. O commit permite recuperar o código exato de cada treino.
+O nome do modelo e da pasta de resultados junta experimento, rede, tamanho da
+imagem, versão do pré-processamento, commit do código e data-hora da execução:
+nada é sobrescrito, e o commit permite recuperar o código exato de cada treino.
 
 ## Pipeline
 
@@ -127,19 +147,17 @@ os dados da APTOS 2019, e fazer ensemble de dobras ou sementes.
 
 ## Reprodutibilidade
 
-Semente fixa (`SEED = 42`) aplicada a Python, NumPy e TensorFlow, com operações
-determinísticas ativadas quando o ambiente permite. Trocar a semente, o
-pré-processamento ou o mapeamento dos rótulos invalida os caches de imagens
-processadas e os CSVs de split já salvos — mude `VERSAO_PRE_PROCESSAMENTO` ou
-`VERSAO_SPLIT` em `configuracao.py`, ou regenere-os.
+A divisão treino/validação/teste usa sempre `SEED_SPLIT = 42`; a semente do treino
+(`SEED_TREINO`, padrão 42, `RETINOPATIA_SEED_TREINO` para repetir um experimento)
+vale para Python, NumPy e TensorFlow, com operações determinísticas ativadas quando
+o ambiente permite. Mudar o pré-processamento ou o mapeamento dos rótulos invalida
+os caches de imagens processadas e os CSVs de split já salvos — mude
+`VERSAO_PRE_PROCESSAMENTO` ou `VERSAO_SPLIT` em `configuracao.py`, ou regenere-os.
 
 Para carregar o modelo salvo, informe a camada personalizada:
 
 ```python
-from retinopatia.modelo import GeM
-modelo = tf.keras.models.load_model(
-    configuracao.CAMINHO_MODELO_FINAL,
-    custom_objects={"GeM": GeM}
-)
+from retinopatia.modelo import carregar_modelo_salvo
+modelo = carregar_modelo_salvo(configuracao.CAMINHO_MODELO_FINAL)
 ```
 # ml-retinopatia
