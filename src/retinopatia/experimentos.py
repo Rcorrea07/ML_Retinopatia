@@ -54,21 +54,33 @@ EXPERIMENTOS = {
     },
 
     # --------------------------------------------------------
-    # Rodada 2 (resolução provisória: trocar pela melhor da rodada 1)
+    # Rodada 2, em 640 px: o R02 (B0 640) venceu a rodada 1 com
+    # especificidade 0,732 por paciente (E01: 0,671)
     # --------------------------------------------------------
 
     # Os dois olhos do paciente na mesma decisão, com pesos
     # compartilhados. Fontes: Jeffrey De Fauw e o_O (blend por paciente).
-    "R04_b0_pares": {
+    # Custa cerca do dobro de um treino comum: só roda se o combinador
+    # dos dois olhos (analise.combinador_paciente) mostrar ganho.
+    "R04_b0_pares_640": {
         "BACKBONE": "EfficientNetB0",
-        "TAMANHO_IMAGEM": (512, 512),
+        "TAMANHO_IMAGEM": (640, 640),
         "MODELO_PARES": True,
     },
 
     # Fonte: 1º lugar APTOS 2019 (EfficientNets, GeM, regressão).
-    "R05_v2b0": {
+    "R05_v2b0_640": {
         "BACKBONE": "EfficientNetV2B0",
-        "TAMANHO_IMAGEM": (512, 512),
+        "TAMANHO_IMAGEM": (640, 640),
+    },
+
+    # O R02 teve a melhor época na última (12 de 12): ainda melhorava.
+    # Mesma receita, com 18 épocas na Fase 2 (o cosseno se estica junto).
+    "R06_b0_640_longo": {
+        "BACKBONE": "EfficientNetB0",
+        "TAMANHO_IMAGEM": (640, 640),
+        "EPOCAS_FASE2": 18,
+        "PACIENCIA_EARLY_STOP_FASE2": 4,
     },
 }
 
