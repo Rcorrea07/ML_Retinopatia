@@ -316,7 +316,18 @@ def medir_velocidade(dataset, passos=50):
     O primeiro lote é descartado da medição (inclui a montagem do
     pipeline). Na primeira época os bytes ainda estão sendo lidos do
     disco; nas seguintes vêm do cache em memória.
+
+    Com poucos lotes (execução de fumaça), mede só os que existem.
     """
+
+    lotes = int(dataset.cardinality())
+
+    if lotes > 0:
+        passos = min(passos, lotes - 1)
+
+    if passos < 1:
+        print("\nPoucos lotes para medir a velocidade do pipeline.")
+        return
 
     iterador = iter(dataset)
     next(iterador)
