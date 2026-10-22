@@ -13,6 +13,12 @@ contra 0,1 s por lote no predict, com a mesma rede.
 Cada lote traz os rótulos das duas saídas do modelo:
     x, {"doente": classe binária, "grau": grau original 0 a 4}
 
+No modelo de pares (`configuracao.MODELO_PARES`), `x` é um dicionário
+com a imagem do olho e a do outro olho do mesmo paciente (colunas
+`image_par` e `pasta_processada_par`, ver `conjunto_dados.adicionar_par`);
+os rótulos continuam os do olho. Na destilação, os rótulos ganham a
+probabilidade do professor (coluna `prob_professor`).
+
 Os conjuntos de validação e de teste nunca embaralham, para que a ordem
 das predições corresponda à ordem das linhas de `df_val` e `df_teste`
 na hora da avaliação.
@@ -88,10 +94,13 @@ def criar_aumento_dados(
 
 def _rotulos(df):
     """
-    Monta o dicionário de rótulos das duas saídas, no formato (n, 1).
+    Monta o dicionário de rótulos das saídas, no formato (n, 1).
+
+    Na destilação, a saída `professor` usa a coluna `prob_professor`
+    (só existe no treino); sem ela (validação e teste), o próprio rótulo.
     """
 
-    return {
+    rotulos = {
         configuracao.SAIDA_DOENTE: (
             df["target"]
             .astype("float32")
@@ -106,6 +115,36 @@ def _rotulos(df):
         )
     }
 
+    if configuracao.DESTILACAO:
+        coluna = "prob_professor" if "prob_professor" in df else "target"
+
+        rotulos[configuracao.SAIDA_PROFESSOR] = (
+            df[coluna]
+            .astype("float32")
+            .values
+            .reshape(-1, 1)
+        )
+
+    return rotulos
+
+
+def _caminhos(df, pasta_imagens, coluna_imagem="image", coluna_pasta="pasta_processada"):
+    """
+    Caminho de cada imagem: a pasta da linha (coluna `pasta_processada`,
+    no treino ampliado com as imagens extras) ou `pasta_imagens`.
+    """
+
+    pastas = (
+        df[coluna_pasta]
+        if coluna_pasta in df
+        else [pasta_imagens] * len(df)
+    )
+
+    return [
+        os.path.join(pasta, nome)
+        for pasta, nome in zip(pastas, df[coluna_imagem])
+    ]
+
 
 def criar_dataset(
     df,
@@ -113,7 +152,8 @@ def criar_dataset(
     pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
     tamanho_imagem=configuracao.TAMANHO_IMAGEM,
     tamanho_lote=configuracao.TAMANHO_LOTE,
-    seed=configuracao.SEED
+    seed=configuracao.SEED,
+    pares=configuracao.MODELO_PARES
 ):
     """
     Cria o tf.data.Dataset de um conjunto.
@@ -121,39 +161,55 @@ def criar_dataset(
     Com `treino=True`, embaralha a cada época. Com `treino=False`,
     mantém a ordem do DataFrame. O data augmentation não fica aqui: ele
     roda dentro do modelo.
+
+    Com `pares=True`, cada exemplo traz também a imagem do outro olho
+    do paciente.
     """
-
-    # Com a coluna `pasta_processada` (treino ampliado com as imagens
-    # extras), cada imagem vem da sua pasta; sem ela, de `pasta_imagens`
-    pastas = (
-        df["pasta_processada"]
-        if "pasta_processada" in df
-        else [pasta_imagens] * len(df)
-    )
-
-    caminhos = [
-        os.path.join(pasta, nome)
-        for pasta, nome in zip(pastas, df["image"])
-    ]
 
     formato = tuple(tamanho_imagem) + (3,)
 
-    def ler_imagem(conteudo, rotulos):
+    def decodificar(conteudo):
         img = tf.io.decode_jpeg(conteudo, channels=3)
 
         # Falha cedo se o cache tiver sido gerado com outro tamanho
         img = tf.ensure_shape(img, formato)
 
-        return tf.cast(img, tf.float32), rotulos
+        return tf.cast(img, tf.float32)
+
+    if pares:
+        from .modelo import ENTRADA_OLHO, ENTRADA_OUTRO_OLHO
+
+        if "image_par" not in df:
+            raise ValueError(
+                "O modelo de pares precisa da coluna image_par "
+                "(conjunto_dados.adicionar_par)."
+            )
+
+        caminhos = {
+            ENTRADA_OLHO: _caminhos(df, pasta_imagens),
+            ENTRADA_OUTRO_OLHO: _caminhos(
+                df,
+                pasta_imagens,
+                "image_par",
+                "pasta_processada_par"
+            )
+        }
+
+    else:
+        caminhos = _caminhos(df, pasta_imagens)
 
     dataset = tf.data.Dataset.from_tensor_slices(
         (caminhos, _rotulos(df))
     )
 
-    # Guarda os bytes comprimidos em memória (cerca de 1 a 2 GB), e não
-    # as imagens decodificadas, que não caberiam na RAM do Colab.
+    # Guarda os bytes comprimidos em memória (cerca de 5 GB no treino
+    # ampliado em 448; o dobro no modelo de pares), e não as imagens
+    # decodificadas, que não caberiam na RAM do Colab.
     dataset = dataset.map(
-        lambda caminho, rotulos: (tf.io.read_file(caminho), rotulos),
+        lambda caminho, rotulos: (
+            tf.nest.map_structure(tf.io.read_file, caminho),
+            rotulos
+        ),
         num_parallel_calls=AUTOTUNE
     ).cache()
 
@@ -165,7 +221,10 @@ def criar_dataset(
         )
 
     dataset = dataset.map(
-        ler_imagem,
+        lambda conteudo, rotulos: (
+            tf.nest.map_structure(decodificar, conteudo),
+            rotulos
+        ),
         num_parallel_calls=AUTOTUNE
     ).batch(tamanho_lote)
 
@@ -214,8 +273,9 @@ def verificar_escala(treino_data, val_data):
     EfficientNet espera.
     """
 
-    x_treino = next(iter(treino_data.take(1)))[0].numpy()
-    x_val = next(iter(val_data.take(1)))[0].numpy()
+    # No modelo de pares a entrada é um dicionário; basta uma das imagens
+    x_treino = tf.nest.flatten(next(iter(treino_data.take(1)))[0])[0].numpy()
+    x_val = tf.nest.flatten(next(iter(val_data.take(1)))[0])[0].numpy()
 
     print("\nVerificação da escala das imagens:")
 
@@ -268,7 +328,7 @@ def medir_velocidade(dataset, passos=50):
 
     duracao = time.perf_counter() - inicio
 
-    tamanho_lote = lote[0].shape[0]
+    tamanho_lote = tf.nest.flatten(lote[0])[0].shape[0]
 
     print(
         f"\nPipeline: {duracao / passos:.3f} s por lote | "
