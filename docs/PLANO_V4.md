@@ -52,8 +52,9 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R04 | 2 | B0 com pares de olhos, 640 px (pulado: o combinador não mostrou ganho) | — | — | — | — | — |
 | R05 | 2 | EfficientNetV2-B0, 640 px | 0,744 | 0,740 | 0,781 | 0,929 | 0,838 |
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
-| R07 | 3 | Combinação das alavancas vencedoras | | | | | |
-| R08–R09 | 3 | R07 com sementes 17 e 73 (mesmo split) | | | | | |
+| R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | | | | | |
+| R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | | | | | |
+| R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
 | R10 | reserva | 768 px ou decisão ordinal | | | | | |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
@@ -129,6 +130,21 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
   uma segunda semente de cada (R02 e R05 com `RETINOPATIA_SEED_TREINO=17`),
   porque a diferença entre elas é menor que o ruído. Depois, o teste do modelo
   escolhido e a latência no TFLite.
+
+### Rodada 3 (pronta para rodar)
+
+1. Conferir o saldo de unidades (Ambiente de execução → Ver recursos) e
+   combinar o horário da verificação do Drive. Cada treino a 640 px custa de
+   4 a 5 h de A100, cerca de 25 unidades.
+2. Abrir `notebooks/execucoes/R07_b0_640_seed17.ipynb` e
+   `notebooks/execucoes/R08_v2b0_640_seed17.ipynb`, cada um em uma sessão
+   A100 com RAM alta, e rodar tudo. Para o Drive montar, rode a cópia salva no
+   Drive ("Arquivo → Salvar uma cópia no Drive"), não o notebook aberto direto
+   do GitHub.
+3. Escolher entre B0 e V2-B0 pela média das duas sementes na validação (ROC-AUC
+   e especificidade por paciente), pesando o custo no celular.
+4. R09: avaliar o modelo escolhido no teste uma única vez e exportar para
+   TFLite (fp16 e int8), conferindo tamanho, latência e paridade com o Keras.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
