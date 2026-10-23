@@ -51,7 +51,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R03 | 1 | Destilação B4 448 → B0 448 | 0,609 | 0,605 | 0,686 | 0,904 | 0,809 |
 | R04 | 2 | B0 com pares de olhos, 640 px (pulado: o combinador não mostrou ganho) | — | — | — | — | — |
 | R05 | 2 | EfficientNetV2-B0, 640 px | 0,744 | 0,740 | 0,781 | 0,929 | 0,838 |
-| R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | | | | | |
+| R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
 | R07 | 3 | Combinação das alavancas vencedoras | | | | | |
 | R08–R09 | 3 | R07 com sementes 17 e 73 (mesmo split) | | | | | |
 | R10 | reserva | 768 px ou decisão ordinal | | | | | |
@@ -110,7 +110,25 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
 - **No celular, custa mais que a B0:** pelo artigo da EfficientNetV2, a V2-B0
   tem 7,1 M de parâmetros e cerca de 0,72 GFLOPs a 224 px, contra 5,3 M e
   0,39 GFLOPs da B0. Medir a latência no TFLite antes de escolhê-la.
-- **R06 (B0 640, 18 épocas):** ainda rodando.
+- **R06 (B0 640, 18 épocas) não ganhou com o treino mais longo.** A melhor
+  época foi a 10 (PR-AUC de validação 0,8875) e o early stopping parou na 14.
+  Por paciente: ROC-AUC 0,926 e especificidade 0,755 sem TTA; 0,929 e 0,715
+  com TTA4; kappa 0,830. Por olho, igual ao R02 (grau 0 marcado em 26,6% dos
+  olhos, grau 1 detectado em 70%). No R02, a melhor época ser a última vinha do
+  fim do cosseno (taxa de aprendizado perto de zero), e não de falta de épocas:
+  as 12 épocas ficam.
+- **Conclusão da leva 2:** R02, R05 e R06 ficam a menos de 0,006 de ROC-AUC
+  entre si, e as especificidades oscilam dentro do ruído. O R05 fica à frente na
+  ROC-AUC em todos os modos e no kappa. A única alavanca clara continua sendo
+  os 640 px. Nenhuma execução mudou o ponto de operação por olho: o grau 1, em
+  cerca de 70%, é o gargalo.
+- **As unidades de computação do Colab acabaram** no fim da leva 2 (o painel de
+  recursos diz que não há unidades disponíveis). As levas 1 e 2 gastaram as 156
+  do Pro+. As próximas rodadas dependem de unidades novas.
+- **Próxima rodada, quando houver unidades:** a escolha entre B0 e V2-B0 pede
+  uma segunda semente de cada (R02 e R05 com `RETINOPATIA_SEED_TREINO=17`),
+  porque a diferença entre elas é menor que o ruído. Depois, o teste do modelo
+  escolhido e a latência no TFLite.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
