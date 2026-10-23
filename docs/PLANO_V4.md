@@ -49,8 +49,8 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R01 | 1 | B0 512 | 0,686 | 0,705 | 0,720 | 0,914 | 0,820 |
 | **R02** | 1 | **B0 640** | **0,732** | 0,723 | 0,714 | **0,923** | 0,818 |
 | R03 | 1 | Destilação B4 448 → B0 448 | 0,609 | 0,605 | 0,686 | 0,904 | 0,809 |
-| R04 | 2 | B0 com pares de olhos, 640 px (só se o combinador mostrar ganho) | | | | | |
-| R05 | 2 | EfficientNetV2-B0, 640 px | | | | | |
+| R04 | 2 | B0 com pares de olhos, 640 px (pulado: o combinador não mostrou ganho) | — | — | — | — | — |
+| R05 | 2 | EfficientNetV2-B0, 640 px | 0,744 | 0,740 | 0,781 | 0,929 | 0,838 |
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | | | | | |
 | R07 | 3 | Combinação das alavancas vencedoras | | | | | |
 | R08–R09 | 3 | R07 com sementes 17 e 73 (mesmo split) | | | | | |
@@ -90,6 +90,27 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
   projeto recusa montar o Drive de outra conta ("mount failed"), e o Colab
   gratuito da conta pessoal não tem disco para extrair o dataset bruto (~105 GB).
   R05 e R06 processam as imagens de 640 na própria sessão (cerca de 1 h a mais).
+
+### Leva 2 (22/10/2026, commit `1b45ca0`, R05 e R06 em paralelo)
+
+- **R05 (EfficientNetV2-B0, 640 px) empatou com o R02, com leve vantagem.**
+  Sem TTA, ROC-AUC 0,929 e especificidade 0,744 (R02: 0,923 e 0,732). Com
+  TTA4, 0,932 e 0,781 (R02: 0,926 e 0,714). Kappa da cabeça de grau 0,838
+  (R02: 0,818). A ROC-AUC sobe cerca de 0,006 em todos os modos; o salto da
+  especificidade com TTA4 está no ponto de 90% de sensibilidade, que oscila de
+  um modo para outro, e precisa de outras sementes antes de valer.
+- **Por olho, o R05 é igual ao R02:** ROC-AUC 0,932 com TTA4 (R02: 0,931); grau
+  0 marcado como doente em 25,6% dos olhos (R02: 25,5%), grau 1 detectado em
+  69% (R02: 69%), graus 2 a 4 em 96–99%. A pequena vantagem aparece só por
+  paciente.
+- **Treina mais rápido:** 470 s por época na Fase 2 contra 656 s da B0 a 640
+  (−28%), com pico de 6,1 GB de GPU. A melhor época foi a última (12 de 12),
+  mas a PR-AUC de validação já tinha estabilizado (0,8887 → 0,8892 nas três
+  últimas).
+- **No celular, custa mais que a B0:** pelo artigo da EfficientNetV2, a V2-B0
+  tem 7,1 M de parâmetros e cerca de 0,72 GFLOPs a 224 px, contra 5,3 M e
+  0,39 GFLOPs da B0. Medir a latência no TFLite antes de escolhê-la.
+- **R06 (B0 640, 18 épocas):** ainda rodando.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
