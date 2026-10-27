@@ -82,6 +82,20 @@ EXPERIMENTOS = {
         "EPOCAS_FASE2": 18,
         "PACIENCIA_EARLY_STOP_FASE2": 4,
     },
+
+    # --------------------------------------------------------
+    # Rodada 3: R02 e R05 com a semente 17 (notebooks R07 e R08, com
+    # RETINOPATIA_SEED_TREINO) e a reserva em 768 px
+    # --------------------------------------------------------
+
+    # O grau 1 (só microaneurismas) ficou em ~70% em todos os treinos:
+    # 448 → 640 cortou os falsos positivos no grau 0, mas não mexeu nele.
+    # Mesma receita do R02 em 768 px, para medir só a resolução.
+    # Fonte: Reformed Gamblers (385 contra 767 px).
+    "R10_b0_768": {
+        "BACKBONE": "EfficientNetB0",
+        "TAMANHO_IMAGEM": (768, 768),
+    },
 }
 
 
