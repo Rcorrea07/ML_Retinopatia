@@ -55,7 +55,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | | | | | |
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | | | | | |
 | R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
-| R10 | reserva | 768 px ou decisão ordinal | | | | | |
+| R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | | | | | |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -136,9 +136,11 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
 1. Conferir o saldo de unidades (Ambiente de execução → Ver recursos) e
    combinar o horário da verificação do Drive. Cada treino a 640 px custa de
    4 a 5 h de A100, cerca de 25 unidades.
-2. Abrir `notebooks/execucoes/R07_b0_640_seed17.ipynb` e
-   `notebooks/execucoes/R08_v2b0_640_seed17.ipynb`, cada um em uma sessão
-   A100 com RAM alta, e rodar tudo. Para o Drive montar, rode a cópia salva no
+2. Abrir `notebooks/execucoes/R07_b0_640_seed17.ipynb`,
+   `notebooks/execucoes/R08_v2b0_640_seed17.ipynb` e
+   `notebooks/execucoes/R10_b0_768.ipynb`, cada um em uma sessão A100 com RAM
+   alta, e rodar tudo. Com 600 unidades (27/10), a terceira sessão vai para o
+   R10, cerca de 6 h e 32 unidades. Para o Drive montar, rode a cópia salva no
    Drive ("Arquivo → Salvar uma cópia no Drive"), não o notebook aberto direto
    do GitHub.
 3. Escolher entre B0 e V2-B0 pela média das duas sementes na validação (ROC-AUC
