@@ -512,6 +512,14 @@ PASTA_RESULTADOS = os.path.join(
     NOME_EXPERIMENTO
 )
 
+# Os pesos da melhor época de cada fase só servem dentro da sessão (o
+# modelo final completo vai para modelos/). Ficam no disco local: no
+# Drive, eram 100 a 400 MB repetidos por treino.
+PASTA_CHECKPOINTS = os.path.join(
+    "/content/checkpoints",
+    NOME_EXPERIMENTO
+)
+
 # Cada execução grava só o seu resumo (resumo.csv na sua pasta). A tabela
 # geral, com uma linha por treino, é atualizada por
 # `avaliacao.consolidar_experimentos()`, chamada uma vez depois das
@@ -534,7 +542,7 @@ EPOCAS_FASE1 = 2
 TAXA_APRENDIZADO_FASE1 = 1e-3
 
 CAMINHO_PESOS_FASE1 = os.path.join(
-    PASTA_RESULTADOS,
+    PASTA_CHECKPOINTS,
     "melhor_modelo_fase1.weights.h5"
 )
 
@@ -574,7 +582,7 @@ if FUMACA:
 FRACAO_LR_FINAL = 0.01
 
 CAMINHO_PESOS_FASE2 = os.path.join(
-    PASTA_RESULTADOS,
+    PASTA_CHECKPOINTS,
     "melhor_modelo_fase2.weights.h5"
 )
 
@@ -612,12 +620,18 @@ AVALIAR_TESTE = os.environ.get("RETINOPATIA_AVALIAR_TESTE", "0") == "1"
 # pré-processamento, commit e execução, por exemplo
 # "R01_b0_512_B0_512_v3_extra_ab12cd3_20261022_1430". Os modelos antigos
 # (antes dos experimentos nomeados) não têm o experimento nem a execução.
+# Uma semente de treino diferente da padrão entra no nome: dois treinos do
+# mesmo experimento na mesma sessão (execucao.treinar_em_paralelo)
+# gravariam o mesmo arquivo.
+SUFIXO_SEMENTE = "" if SEED_TREINO == SEED_SPLIT else f"_seed{SEED_TREINO}"
+
 NOME_MODELO = (
     f"{EXPERIMENTO}_"
     f"{BACKBONE.replace('EfficientNet', '')}"
     f"_{TAMANHO_IMAGEM[0]}"
     f"_{VERSAO_PRE_PROCESSAMENTO}"
     f"{SUFIXO_DADOS}"
+    f"{SUFIXO_SEMENTE}"
     f"_{COMMIT_CODIGO}"
     f"_{ID_EXECUCAO}"
 )
@@ -685,6 +699,28 @@ CAMINHO_PROFESSOR = os.path.join(
 TAMANHO_IMAGEM_PROFESSOR = (448, 448)
 
 PASTA_IMAGENS_PROFESSOR = "/content/dataset_retina_v3_448"
+
+# ============================================================
+# VÁRIOS TREINOS NA MESMA GPU (execucao.treinar_em_paralelo)
+# ============================================================
+
+# Memória reservada por treino para decidir quantos rodam ao mesmo tempo.
+# Medido no R10 (B0 768, lote 32): pico de 12,6 GB de VRAM e 25 GB de
+# RAM. Uma A100 do Colab (80 GB de VRAM, 167 GB de RAM) comporta três.
+VRAM_POR_TREINO_GB = 16
+RAM_POR_TREINO_GB = 27
+FOLGA_RAM_GB = 10
+
+# De quanto em quanto tempo o notebook mostra o andamento dos treinos
+INTERVALO_ACOMPANHAMENTO_MIN = 10
+
+# Saída de cada treino (uma linha por época), copiada para o Drive
+PASTA_LOGS_LOCAL = "/content/logs_treinos"
+
+PASTA_LOGS_PARALELOS = os.path.join(
+    PASTA_RESULTADOS_GERAL,
+    "logs_paralelos"
+)
 
 # ============================================================
 # CONFERÊNCIA DO EXPERIMENTO

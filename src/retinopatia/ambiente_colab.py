@@ -30,6 +30,18 @@ def montar_drive(ponto_de_montagem="/content/drive"):
     drive.mount(ponto_de_montagem)
 
 
+def desligar_ambiente():
+    """
+    Encerra a sessão do Colab e libera a GPU. Uma sessão parada depois do
+    fim do treino continua gastando unidades de computação.
+    """
+
+    from google.colab import runtime
+
+    print("Desligando o ambiente de execução...")
+    runtime.unassign()
+
+
 def _executar(comando):
     """
     Executa um comando de shell e interrompe em caso de erro.

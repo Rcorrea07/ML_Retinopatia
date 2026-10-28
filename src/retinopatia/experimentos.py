@@ -96,6 +96,18 @@ EXPERIMENTOS = {
         "BACKBONE": "EfficientNetB0",
         "TAMANHO_IMAGEM": (768, 768),
     },
+
+    # --------------------------------------------------------
+    # Rodada 4: as duas alavancas da rodada 3 juntas. A V2-B0 venceu a
+    # B0 em 640 px nas duas sementes (por paciente), e o B0 768 foi o
+    # melhor por olho. Roda com o R10 semente 17 numa sessão só
+    # (execucao.rodar_rodada), os três em 768 px.
+    # --------------------------------------------------------
+
+    "R11_v2b0_768": {
+        "BACKBONE": "EfficientNetV2B0",
+        "TAMANHO_IMAGEM": (768, 768),
+    },
 }
 
 
