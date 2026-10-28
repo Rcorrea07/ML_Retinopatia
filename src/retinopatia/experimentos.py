@@ -108,6 +108,21 @@ EXPERIMENTOS = {
         "BACKBONE": "EfficientNetV2B0",
         "TAMANHO_IMAGEM": (768, 768),
     },
+
+    # --------------------------------------------------------
+    # Final (R09): sem treino. O B0 768 escolhido
+    # (CAMINHO_MODELO_ESCOLHIDO) medido uma vez no teste e convertido
+    # para TFLite, pelo notebook Modelo_Final (modelo_final.rodar_final).
+    # TTA2 teve a maior especificidade por paciente na validação nas
+    # duas sementes do B0 768 (0,790 e 0,785, contra 0,780 e 0,765 com
+    # TTA4); o teste mede os três modos.
+    # --------------------------------------------------------
+
+    "R09_final_b0_768": {
+        "BACKBONE": "EfficientNetB0",
+        "TAMANHO_IMAGEM": (768, 768),
+        "MODO_TTA": "tta2",
+    },
 }
 
 

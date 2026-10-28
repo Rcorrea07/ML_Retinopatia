@@ -601,9 +601,14 @@ PACIENCIA_EARLY_STOP_FASE2 = _valor("PACIENCIA_EARLY_STOP_FASE2", 3)
 # falsos positivos, por isso o limiar é escolhido pela sensibilidade.
 SENSIBILIDADE_DESEJADA = 0.90
 
-# Test-time augmentation: média das predições da imagem original e de
-# seus espelhamentos horizontal, vertical e em ambos os eixos.
-TTA_ATIVO = True
+# Test-time augmentation usada na avaliação principal (limiares e
+# relatórios): "sem_tta", "tta2" (original e espelho horizontal) ou
+# "tta4" (mais os espelhos vertical e nos dois eixos). Os três modos são
+# previstos de uma vez e comparados em todas as avaliações.
+MODO_TTA = _valor("MODO_TTA", "tta4")
+
+if MODO_TTA not in ("sem_tta", "tta2", "tta4"):
+    raise ValueError(f"MODO_TTA desconhecido: {MODO_TTA} (sem_tta, tta2 ou tta4).")
 
 # O teste só mede o modelo final escolhido. Nos experimentos ele fica
 # fechado: tudo é comparado e escolhido na validação, e abrir o teste a
@@ -699,6 +704,36 @@ CAMINHO_PROFESSOR = os.path.join(
 TAMANHO_IMAGEM_PROFESSOR = (448, 448)
 
 PASTA_IMAGENS_PROFESSOR = "/content/dataset_retina_v3_448"
+
+# ============================================================
+# MODELO FINAL ESCOLHIDO (R09, modelo_final.py)
+# ============================================================
+
+# B0 768 (R10): o melhor por olho nas duas sementes e empatado por
+# paciente com os outros candidatos, e mais leve no celular que a V2-B0.
+# Das duas sementes, a de maior especificidade por paciente na validação
+# com TTA2 (0,790 contra 0,785).
+CAMINHO_MODELO_ESCOLHIDO = _valor(
+    "CAMINHO_MODELO_ESCOLHIDO",
+    os.path.join(
+        PASTA_MODELOS,
+        "R10_b0_768_B0_768_v3_extra_c35c12a_20261027_1920.keras"
+    )
+)
+
+# Versões para o celular (TFLite) do modelo escolhido
+PASTA_TFLITE = os.path.join(
+    PASTA_MODELOS,
+    "tflite"
+)
+
+# Imagens da validação usadas para conferir que o TFLite prevê o mesmo
+# que o Keras (as primeiras do conjunto, sem TTA)
+AMOSTRAS_PARIDADE_TFLITE = 200
+
+# Maior diferença de probabilidade aceita entre o modelo de inferência
+# (float32, sem augmentation) e o modelo treinado (precisão mista)
+TOLERANCIA_INFERENCIA = 0.02
 
 # ============================================================
 # VÁRIOS TREINOS NA MESMA GPU (execucao.treinar_em_paralelo)

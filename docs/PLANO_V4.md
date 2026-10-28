@@ -54,7 +54,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
 | R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | 0,753 | 0,759 | 0,738 | 0,924 | 0,835 |
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
-| R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
+| R09 | final | B0 768 (R10, semente 42): teste uma vez, com TTA2, e TFLite | | | | | |
 | R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
 | R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
 | R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
@@ -243,3 +243,23 @@ finalistas são repetidos com outras sementes antes da decisão.
 2. Escolher TTA2 ou TTA4 pela validação.
 3. Exportar para TFLite (fp16 e int8) e conferir tamanho e paridade com o Keras.
 4. Adaptar a API e o app para duas fotos por exame (tarefa separada).
+
+### R09 (pronto para rodar)
+
+`notebooks/execucoes/R09_final_b0_768.ipynb` (lógica em
+`src/retinopatia/modelo_final.py`), numa sessão A100 com RAM alta, uma vez só:
+
+1. Processa só as imagens da validação e do teste em 768 px (~7 mil).
+2. Carrega o B0 768 escolhido: R10 com semente 42, a de maior especificidade
+   por paciente na validação com TTA2 (0,790 contra 0,785 da semente 17).
+3. Escolhe os limiares na validação com TTA2, o melhor modo nas duas sementes
+   do B0 768, e mede o teste uma única vez. Os três modos (sem TTA, TTA2 e
+   TTA4) também são medidos, cada um com o seu limiar da validação, para
+   decidir quantas passagens pela rede o celular faz.
+4. Gera `modelos/tflite/<modelo>_{fp32,fp16,int8}.tflite`: entrada float32
+   [1, 768, 768, 3] com a imagem processada em 0–255, saída [1, 2] com a
+   probabilidade e o grau. Confere em 200 imagens da validação que cada
+   arquivo prevê o mesmo que o Keras (diferença, ROC-AUC, tamanho e tempo na
+   CPU do Colab; o tempo no celular fica para o app).
+
+Sem treino, deve levar menos de 1 h (~5 unidades). A sessão desliga sozinha.

@@ -332,6 +332,67 @@ def carregar_modelo_salvo(caminho):
     )
 
 
+def construir_modelo_inferencia(
+    modelo_treinado,
+    formato_entrada=configuracao.FORMATO_ENTRADA,
+    nome_backbone=configuracao.BACKBONE
+):
+    """
+    Versão para o celular de um modelo treinado (de uma imagem, sem
+    pares nem destilação): sem o bloco de augmentation, toda em float32
+    e com uma saída só, [probabilidade de retinopatia, grau previsto].
+
+    A rede é montada de novo em float32 (sem baixar os pesos da
+    ImageNet) e recebe os pesos do modelo treinado camada a camada: a
+    precisão mista e as camadas aleatórias do augmentation atrapalham a
+    conversão para TFLite. A entrada continua a imagem processada em
+    0–255 (`pre_processamento.processar_retina`).
+    """
+
+    politica = tf.keras.mixed_precision.global_policy()
+    tf.keras.mixed_precision.set_global_policy("float32")
+
+    try:
+        modelo_base = BACKBONES[nome_backbone](
+            weights=None,
+            include_top=False,
+            input_shape=formato_entrada
+        )
+
+        entrada = layers.Input(shape=formato_entrada, name="imagem")
+
+        x = modelo_base(entrada, training=False)
+        x = GeM(name="gem")(x)
+
+        doente = layers.Dense(1, activation="sigmoid", name=configuracao.SAIDA_DOENTE)(x)
+        grau = layers.Dense(1, name=configuracao.SAIDA_GRAU)(x)
+
+        saida = layers.Concatenate(name="doente_e_grau")([doente, grau])
+
+        inferencia = models.Model(entrada, saida, name="retinopatia_celular")
+
+    finally:
+        tf.keras.mixed_precision.set_global_policy(politica)
+
+    extrator = modelo_treinado.get_layer("extrator")
+
+    # No extrator: entrada, augmentation (Sequential), rede base e GeM
+    base_treinada = next(
+        camada for camada in extrator.layers
+        if isinstance(camada, models.Model) and camada.name != "aumento_dados"
+    )
+
+    modelo_base.set_weights(base_treinada.get_weights())
+    inferencia.get_layer("gem").set_weights(extrator.get_layer("gem").get_weights())
+
+    for nome in (configuracao.SAIDA_DOENTE, configuracao.SAIDA_GRAU):
+        inferencia.get_layer(nome).set_weights(
+            modelo_treinado.get_layer(nome).get_weights()
+        )
+
+    return inferencia
+
+
 def salvar_modelo_final(
     modelo,
     dados,
