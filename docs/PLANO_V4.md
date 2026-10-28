@@ -56,6 +56,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
 | R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
 | R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
+| R11 | 4 | V2-B0 em 768 px, sementes 42 e 17 (com o R10 semente 17) | | | | | |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -166,11 +167,33 @@ Validação por paciente; médias das duas sementes (42 e 17):
 - **Custo no celular, relativo à B0 640:** B0 768 ≈ 1,4× (pixels); V2-B0 640
   ≈ 1,8× (FLOPs do artigo); V2-B0 768 ≈ 2,7×.
 
-Próximo passo sugerido (rodada 4, cerca de 95 unidades, 3 sessões): R11 =
-V2-B0 em 768 px com as sementes 42 e 17, e o R10 com a semente 17. Assim os
-três candidatos (V2-B0 640, B0 768 e V2-B0 768) ficam com duas sementes cada.
-Depois, R09: teste uma única vez no escolhido e TFLite (fp16 e int8), conferindo
-tamanho, latência e paridade com o Keras.
+Próximo passo sugerido: R11 = V2-B0 em 768 px com as sementes 42 e 17, e o
+R10 com a semente 17. Assim os três candidatos (V2-B0 640, B0 768 e V2-B0 768)
+ficam com duas sementes cada. Depois, R09: teste uma única vez no escolhido e
+TFLite (fp16 e int8), conferindo tamanho, latência e paridade com o Keras.
+
+### Antes da rodada 4: o custo
+
+A rodada 3 gastou ~105 unidades (A100 a ~6,8 unidades/h por sessão, 3
+sessões), mas só ~70 foram de treino. Cerca de 20 foram ~1 h por sessão
+processando as mesmas imagens com a GPU parada, e de 10 a 14 foram sessões
+ligadas depois do fim (o R07 ficou ~1,5 h parado). Cada treino em 768 px usou
+~13 dos 80 GB de VRAM e ~25 dos 167 GB de RAM da A100.
+
+O Colab não deixa escolher a A100 de 40 GB (oferece CPU, T4, L4, A100, H100,
+G4 e TPUs). T4 e L4 têm memória suficiente, mas calculam bem mais devagar (na
+campanha de outubro, a T4 levou ~5 h onde a A100 leva ~1,5 h): mais baratas
+por hora, não necessariamente por treino, e um treino em 768 px numa T4
+chegaria perto do limite de 24 h.
+
+Por isso a rodada 4 roda numa sessão só (`notebooks/execucoes/Rodada4_768.ipynb`,
+lógica em `src/retinopatia/execucao.py`): as imagens são processadas uma vez,
+os três treinos rodam ao mesmo tempo na mesma A100 (cada um num processo, com
+a VRAM alocada sob demanda), cada um passa antes por uma fumaça de poucos
+minutos, e a sessão desliga sozinha no fim, também se der erro. Os
+checkpoints de cada fase ficam no disco local (o `.keras` final já tem os
+melhores pesos). Estimativa: de 45 a 60 unidades, contra ~100 com três
+sessões, dependendo de quanto os três treinos disputam a GPU.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
