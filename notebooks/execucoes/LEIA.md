@@ -15,3 +15,8 @@ sessão só roda o R10 com a semente 17 e o R11 (V2-B0 768) com as sementes 42
 e 17, ao mesmo tempo na mesma A100. As imagens são processadas uma vez, cada
 treino passa antes por uma fumaça de poucos minutos, e a sessão desliga
 sozinha no fim (também se der erro).
+
+`R09_final_b0_768.ipynb` é uma cópia de `notebooks/Modelo_Final.ipynb`: mede o
+B0 768 escolhido no teste, uma vez só, e gera os arquivos TFLite. Abre o teste
+(`RETINOPATIA_AVALIAR_TESTE = "1"`); não rode de novo depois de olhar o
+resultado.
