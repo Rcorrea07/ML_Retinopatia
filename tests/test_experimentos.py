@@ -55,6 +55,8 @@ print(json.dumps({
     "destilacao": c.DESTILACAO,
     "teste": c.AVALIAR_TESTE,
     "epocas": [c.EPOCAS_FASE1, c.EPOCAS_FASE2],
+    "modo_tta": c.MODO_TTA,
+    "modelo_escolhido": c.CAMINHO_MODELO_ESCOLHIDO,
 }))
 """
 
@@ -132,6 +134,16 @@ class EscolhaDeExperimento(unittest.TestCase):
         self.assertTrue(c["resultados"].endswith("_fumaca"))
         self.assertTrue(c["modelo"].startswith(c["resultados"]))
         self.assertTrue(c["pares"])
+
+    def test_final_mede_o_b0_768_escolhido_com_tta2(self):
+        padrao = resolver(experimentos.EXPERIMENTO_PADRAO)
+        final = resolver("R09_final_b0_768", RETINOPATIA_AVALIAR_TESTE="1")
+
+        self.assertEqual(padrao["modo_tta"], "tta4")
+        self.assertEqual(final["modo_tta"], "tta2")
+        self.assertEqual(final["tamanho"], [768, 768])
+        self.assertTrue(final["teste"])
+        self.assertIn("R10_b0_768", final["modelo_escolhido"])
 
     def test_experimento_desconhecido_e_recusado(self):
         with self.assertRaises(RuntimeError) as erro:
