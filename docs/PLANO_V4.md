@@ -56,7 +56,9 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
 | R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
 | R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
-| R11 | 4 | V2-B0 em 768 px, sementes 42 e 17 (com o R10 semente 17) | | | | | |
+| R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
+| R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
+| R11 s17 | 4 | V2-B0 em 768 px, semente 17 | 0,769 | 0,765 | 0,757 | 0,931 | 0,843 |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -194,6 +196,42 @@ minutos, e a sessão desliga sozinha no fim, também se der erro. Os
 checkpoints de cada fase ficam no disco local (o `.keras` final já tem os
 melhores pesos). Estimativa: de 45 a 60 unidades, contra ~100 com três
 sessões, dependendo de quanto os três treinos disputam a GPU.
+
+### Rodada 4 (27–28/10/2026, commit `95e73a9`, uma sessão, 3 treinos juntos)
+
+R10 com a semente 17 e R11 (V2-B0 768) com as sementes 42 e 17, ao mesmo
+tempo na mesma A100. Validação por paciente; médias das sementes 42 e 17:
+
+| Configuração | ROC sem TTA | Espec. sem TTA | ROC TTA4 | Espec. TTA4 | Kappa | Por olho, TTA4: ROC · espec. | Custo no celular |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| B0 640 | 0,924 | 0,742 | 0,927 | 0,726 | 0,826 | 0,932 · 0,756 | 1× |
+| V2-B0 640 | 0,929 | 0,757 | 0,931 | 0,783 | 0,838 | 0,932 · 0,749 | ≈ 1,8× |
+| **B0 768** | 0,927 | 0,752 | 0,931 | 0,772 | 0,830 | **0,938 · 0,782** | ≈ 1,4× |
+| V2-B0 768 | 0,929 | 0,772 | 0,929 | 0,757 | 0,843 | 0,935 · 0,753 | ≈ 2,7× |
+
+- **Por paciente, os quatro empatam:** a ROC-AUC fica entre 0,924 e 0,931, e
+  a especificidade troca de lugar conforme o modo de TTA (diferenças de 1 a 5
+  pontos, dentro do ruído de semente).
+- **A V2-B0 em 768 px não melhora a de 640 px** (ROC 0,929 nas duas, kappa
+  0,843 contra 0,838) e custa ~1,5× mais no celular. Fica de fora.
+- **O B0 768 é o melhor por olho nas duas sementes:** ROC-AUC 0,937 e 0,938,
+  especificidade 0,782 e 0,783, com 21,7 a 21,8% dos olhos sadios marcados
+  como doentes (as outras configurações: 23 a 26%). É também o segundo mais
+  barato no celular.
+- **O grau 1 continua parado:** 68 a 69% nas três execuções; graus 2 a 4 em
+  96 a 100%.
+- **Escolha sugerida para o celular: B0 768.** Reserva: V2-B0 640. Próximo
+  passo (R09): avaliar o B0 768 no teste uma única vez e exportar para TFLite
+  (fp16 e int8), medindo tamanho, latência no celular e paridade com o Keras.
+
+**Custo:** ~65 unidades (saldo de 495 para 430), contra ~105 na rodada 3,
+que teve treinos mais leves (dois em 640 px). A sessão durou ~9,6 h: ~2 h
+processando as imagens de 768 px uma vez, a fumaça dos três (~3 min) e os
+treinos. Com os três juntos, a GPU ficou em 100% e usou 49 de 80 GB; cada
+época da Fase 2 levou ~31 min no V2-B0 e ~46 min no B0 (sozinhos, ~11 e
+~16 min). Rodar junto rendeu pouco, cerca de 10% a mais de trabalho por hora.
+A economia veio de processar as imagens uma vez e de a sessão desligar
+sozinha ao terminar.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
