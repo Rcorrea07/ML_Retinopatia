@@ -52,10 +52,10 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R04 | 2 | B0 com pares de olhos, 640 px (pulado: o combinador não mostrou ganho) | — | — | — | — | — |
 | R05 | 2 | EfficientNetV2-B0, 640 px | 0,744 | 0,740 | 0,781 | 0,929 | 0,838 |
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
-| R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | | | | | |
-| R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | | | | | |
+| R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | 0,753 | 0,759 | 0,738 | 0,924 | 0,835 |
+| R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
 | R09 | final | Modelo escolhido: teste (uma vez) e TFLite | | | | | |
-| R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | | | | | |
+| R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -131,22 +131,46 @@ Validação, por paciente. ROC-AUC sem TTA; kappa da cabeça de grau por olho.
   porque a diferença entre elas é menor que o ruído. Depois, o teste do modelo
   escolhido e a latência no TFLite.
 
-### Rodada 3 (pronta para rodar)
+### Rodada 3 (27/10/2026, commit `c35c12a`, R07, R08 e R10 em paralelo)
 
-1. Conferir o saldo de unidades (Ambiente de execução → Ver recursos) e
-   combinar o horário da verificação do Drive. Cada treino a 640 px custa de
-   4 a 5 h de A100, cerca de 25 unidades.
-2. Abrir `notebooks/execucoes/R07_b0_640_seed17.ipynb`,
-   `notebooks/execucoes/R08_v2b0_640_seed17.ipynb` e
-   `notebooks/execucoes/R10_b0_768.ipynb`, cada um em uma sessão A100 com RAM
-   alta, e rodar tudo. Com 600 unidades (27/10), a terceira sessão vai para o
-   R10, cerca de 6 h e 32 unidades. Para o Drive montar, rode a cópia salva no
-   Drive ("Arquivo → Salvar uma cópia no Drive"), não o notebook aberto direto
-   do GitHub.
-3. Escolher entre B0 e V2-B0 pela média das duas sementes na validação (ROC-AUC
-   e especificidade por paciente), pesando o custo no celular.
-4. R09: avaliar o modelo escolhido no teste uma única vez e exportar para
-   TFLite (fp16 e int8), conferindo tamanho, latência e paridade com o Keras.
+Os notebooks estão em `notebooks/execucoes/` (R07, R08 e R10). Para o Drive
+montar, rode a cópia salva no Drive ("Arquivo → Salvar uma cópia no Drive"),
+não o notebook aberto direto do GitHub. A rodada gastou cerca de 105 das 600
+unidades (sobraram 495).
+
+Validação por paciente; médias das duas sementes (42 e 17):
+
+| Configuração | ROC sem TTA | Espec. sem TTA | ROC TTA4 | Espec. TTA4 | Kappa grau |
+|---|---:|---:|---:|---:|---:|
+| B0 640 (R02 + R07) | 0,924 | 0,742 | 0,927 | 0,726 | 0,826 |
+| V2-B0 640 (R05 + R08) | 0,929 | 0,757 | 0,931 | 0,783 | 0,838 |
+| B0 768 (R10, uma semente) | 0,927 | 0,757 | 0,930 | 0,780 | 0,823 |
+
+- **A V2-B0 vence a B0 em 640 px, nas duas sementes.** A ROC-AUC sem TTA das
+  duas V2-B0 (0,929 e 0,928) fica acima das duas B0 (0,923 e 0,924), e com
+  TTA4 a especificidade das V2-B0 (0,781 e 0,785) fica acima das B0 (0,714 e
+  0,738). Kappa 0,838 contra 0,826. A vantagem só aparece por paciente: por
+  olho, as duas empatam (ROC-AUC 0,932 e 0,931 com TTA4).
+- **Ruído de semente medido:** a mesma receita variou de 2 a 2,6 pontos de
+  especificidade sem TTA (B0: 0,732 e 0,753; V2-B0: 0,744 e 0,771).
+- **768 px (R10) é o melhor por olho:** ROC-AUC 0,937 e especificidade 0,782
+  com TTA4 (B0 640: 0,931 a 0,932 e 0,745 a 0,768). Os olhos sadios marcados
+  como doentes caíram para 21,8% (B0 640: 23 a 26%). Por paciente, empata com
+  a V2-B0 640. Custou 942 s por época na Fase 2 (B0 640: 656 s), pico de
+  12,6 GB de GPU e 25 GB de RAM, cerca de 5 h 20 min no total. Melhor época
+  11 de 12, com a maior PR-AUC de validação até agora (0,897).
+- **O grau 1 não se move:** 68% a 70% dos olhos em todas as execuções da
+  rodada, com B0 ou V2-B0, em 640 ou 768 px (69% a 77% nos treinos anteriores
+  medidos, desde 448 px). Resolução e rede não são a alavanca para ele; pode ser o limite dos
+  próprios rótulos do grau 1.
+- **Custo no celular, relativo à B0 640:** B0 768 ≈ 1,4× (pixels); V2-B0 640
+  ≈ 1,8× (FLOPs do artigo); V2-B0 768 ≈ 2,7×.
+
+Próximo passo sugerido (rodada 4, cerca de 95 unidades, 3 sessões): R11 =
+V2-B0 em 768 px com as sementes 42 e 17, e o R10 com a semente 17. Assim os
+três candidatos (V2-B0 640, B0 768 e V2-B0 768) ficam com duas sementes cada.
+Depois, R09: teste uma única vez no escolhido e TFLite (fp16 e int8), conferindo
+tamanho, latência e paridade com o Keras.
 
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
