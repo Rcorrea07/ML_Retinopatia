@@ -42,6 +42,37 @@ Por que essa divisão:
 Somando DDR, APTOS, BRSET, DeepDRiD e IDRiD, o treino passa de ~82 mil para
 ~117 mil fotos (+43%), e o tempo de cada treino cresce na mesma proporção.
 
+## No treino (R12, 30/10/2026)
+
+Os quatro datasets abertos já baixados entram no treino pelo experimento
+`R12_b0_768_externos` (`src/retinopatia/datasets_externos.py`). Contagens
+conferidas nos zips do Drive:
+
+| Dataset | Fotos no treino | De onde, no zip | O que fica de fora |
+|---|---:|---|---|
+| DDR | 12.522 | `DR_grading/DR_grading/`, rótulos em `DR_grading.csv` | 2 fotos sem rótulo |
+| APTOS 2019 | 3.662 | `train_images/` (png), rótulos em `train.csv` | o test da competição, sem rótulo |
+| DeepDRiD | 931 | `regular_fundus_images/`: treino, validação e avaliação do desafio | as fotos de campo ultra-amplo; as 1.062 com qualidade recusada; 7 sem grau |
+| IDRiD | 516 | parte B, `1. Original Images/a.` e `b.` | as partes A e C, que repetem fotos da B |
+| **Total** | **17.631** | | |
+
+Por grau: 8.615 sem retinopatia, 1.153 de grau 1, 5.861 de grau 2, 682 de
+grau 3 e 1.320 de grau 4. O treino passa de ~82 mil para ~99 mil fotos
+(+22%), com ~20% mais fotos de grau 1.
+
+- **DeepDRiD, só as fotos de qualidade aceita:** o grau vem por olho, não por
+  foto (as duas fotos do mesmo olho levam o mesmo grau), e mais da metade das
+  fotos tem a nota de qualidade "recusada", em que as lesões podem não
+  aparecer. Treinar com elas ensinaria que foto ruim é foto doente.
+- **Nomes:** cada foto processada leva o prefixo do dataset (`ddr_`,
+  `aptos_`, `deepdrid_treino_`, `idrid_testing_`...) e vira .jpg; o
+  paciente também leva o prefixo. Os conjuntos do IDRiD repetem nomes
+  (`IDRiD_001` existe no treino e no teste do desafio, fotos diferentes).
+- **Cache:** um zip por dataset em `ProjetoRetinopatia_caches`
+  (`dataset_retina_v3_768_ddr.zip` etc.), gerado pelo `Preparar_Caches` na
+  conta pessoal. Sem cache, a sessão de treino tira do zip só as fotos com
+  rótulo e as processa (~20 min com os 12 núcleos da A100).
+
 ## Não usar
 
 - **Derivados do EyePACS:** EyeQ (rótulos de qualidade sobre 28.792 fotos do
@@ -60,8 +91,8 @@ Somando DDR, APTOS, BRSET, DeepDRiD e IDRiD, o treino passa de ~82 mil para
 
 ## Cuidados ao juntar
 
-- Descartar as fotos sem grau (a classe "não graduável" do DDR; no DeepDRiD,
-  usar a nota de qualidade).
+- Descartar as fotos sem grau (a classe "não graduável" do DDR, que a cópia
+  do Kaggle já tirou; no DeepDRiD, a nota de qualidade, ver acima).
 - Rodar `processar_retina` em cada dataset e conferir as máscaras suspeitas: o
   enquadramento muda de câmera para câmera, e as cópias do Kaggle já vêm
   recortadas.
