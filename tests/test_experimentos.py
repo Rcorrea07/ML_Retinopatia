@@ -57,6 +57,9 @@ print(json.dumps({
     "epocas": [c.EPOCAS_FASE1, c.EPOCAS_FASE2],
     "modo_tta": c.MODO_TTA,
     "modelo_escolhido": c.CAMINHO_MODELO_ESCOLHIDO,
+    "externos": c.DATASETS_EXTERNOS,
+    "pastas_externas": {n: c.PASTAS_IMAGENS_EXTERNAS[n] for n in c.DATASETS_EXTERNOS},
+    "zips_externos": {n: c.CAMINHOS_ZIP_CACHE_EXTERNOS[n] for n in c.DATASETS_EXTERNOS},
 }))
 """
 
@@ -144,6 +147,50 @@ class EscolhaDeExperimento(unittest.TestCase):
         self.assertEqual(final["tamanho"], [768, 768])
         self.assertTrue(final["teste"])
         self.assertIn("R10_b0_768", final["modelo_escolhido"])
+
+    def test_externos_tem_pasta_e_cache_proprios_e_nome_proprio(self):
+        r10 = resolver("R10_b0_768")
+        r12 = resolver("R12_b0_768_externos")
+
+        self.assertEqual(r10["externos"], [])
+        self.assertEqual(
+            r12["externos"],
+            ["DDR", "APTOS", "DeepDRiD", "IDRiD"]
+        )
+        self.assertEqual(r12["cache"], r10["cache"])
+        self.assertEqual(
+            r12["pastas_externas"]["DDR"],
+            "/content/dataset_retina_v3_768_ddr"
+        )
+        self.assertEqual(
+            r12["zips_externos"]["DeepDRiD"][0],
+            "/content/drive/MyDrive/ProjetoRetinopatia_caches/"
+            "dataset_retina_v3_768_deepdrid.zip"
+        )
+        self.assertIn("_extra_externos_", r12["nome"])
+        self.assertNotIn("_externos", r10["nome"])
+
+    def test_dataset_externo_desconhecido_e_recusado(self):
+        comando = (
+            "from retinopatia import experimentos\n"
+            "experimentos.EXPERIMENTOS['_teste_externo'] = "
+            "{'DATASETS_EXTERNOS': ['Messidor']}\n"
+            "from retinopatia import configuracao\n"
+        )
+
+        resultado = subprocess.run(
+            [sys.executable, "-c", comando],
+            env=dict(
+                os.environ,
+                PYTHONPATH=str(PASTA_SRC),
+                RETINOPATIA_EXPERIMENTO="_teste_externo"
+            ),
+            capture_output=True,
+            text=True
+        )
+
+        self.assertNotEqual(resultado.returncode, 0)
+        self.assertIn("Datasets externos desconhecidos", resultado.stderr)
 
     def test_experimento_desconhecido_e_recusado(self):
         with self.assertRaises(RuntimeError) as erro:
