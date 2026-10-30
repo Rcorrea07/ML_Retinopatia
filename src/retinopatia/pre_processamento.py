@@ -505,11 +505,14 @@ def processar_e_salvar_imagem(
     pasta_saida,
     tamanho_imagem,
     qualidade_jpeg=configuracao.QUALIDADE_JPEG,
+    nome_entrada=None,
     **opcoes_processamento
 ):
     """
     Lê, processa e salva uma imagem. As `opcoes_processamento` são
     repassadas a `processar_retina` (por exemplo, para reproduzir a v2).
+    A foto original é `nome_entrada` (caminho relativo a `pasta_imagens`)
+    quando ele é dado, senão `img_nome`, o nome da imagem processada.
 
     Retorna:
         (nome_da_imagem, status_do_processamento)
@@ -517,7 +520,7 @@ def processar_e_salvar_imagem(
 
     caminho_in = os.path.join(
         pasta_imagens,
-        img_nome
+        nome_entrada or img_nome
     )
 
     caminho_out = os.path.join(
@@ -567,18 +570,24 @@ def pre_processar_dataset(
     tamanho_imagem=configuracao.TAMANHO_IMAGEM,
     maximo_workers=configuracao.MAXIMO_WORKERS,
     caminho_lista_suspeitas=configuracao.CAMINHO_LISTA_SUSPEITAS,
+    coluna_entrada=None,
+    fracao_maxima_falhas=0.0,
     **opcoes_processamento
 ):
     """
     Processa todas as imagens do dataset em paralelo,
     salvando o resultado em `pasta_saida`.
 
-    A execução é interrompida com RuntimeError se alguma imagem falhar
-    ou se alguma imagem esperada não estiver na pasta final. As imagens
-    com máscara suspeita não interrompem: a lista delas é salva em
-    `caminho_lista_suspeitas` (se não for None).
+    A execução é interrompida com RuntimeError se mais de
+    `fracao_maxima_falhas` das imagens falharem (com o padrão 0, uma
+    falha basta) ou se alguma imagem esperada que não falhou não estiver
+    na pasta final. As imagens com máscara suspeita não interrompem: a
+    lista delas é salva em `caminho_lista_suspeitas` (se não for None).
 
-    As `opcoes_processamento` são repassadas a `processar_retina`.
+    A foto original de cada linha é `pasta_imagens`/`image`, ou, com
+    `coluna_entrada`, o caminho dessa coluna (datasets externos, em que
+    a foto original tem outro nome e outra extensão). As
+    `opcoes_processamento` são repassadas a `processar_retina`.
 
     Retorna o DataFrame com o status de cada imagem.
     """
@@ -604,6 +613,8 @@ def pre_processar_dataset(
         **opcoes_processamento
     )
 
+    entradas = dados[coluna_entrada or "image"].values
+
     with ThreadPoolExecutor(
         max_workers=numero_workers
     ) as executor:
@@ -611,8 +622,9 @@ def pre_processar_dataset(
         resultados = list(
             tqdm(
                 executor.map(
-                    processar,
-                    dados["image"].values
+                    lambda nome, entrada: processar(nome, nome_entrada=entrada),
+                    dados["image"].values,
+                    entradas
                 ),
                 total=len(dados)
             )
@@ -660,22 +672,31 @@ def pre_processar_dataset(
         resultados_df["status"].isin(configuracao.STATUS_DE_ERRO)
     ]
 
-    # Interrompe a execução caso alguma imagem tenha falhado
+    # Interrompe a execução se falharem mais imagens que o tolerado
     if not falhas.empty:
         print("\nExemplos de imagens que apresentaram problemas:")
         print(
             falhas.head(20).to_string(index=False)
         )
 
-        raise RuntimeError(
-            f"{len(falhas)} imagens falharam no pré-processamento."
+        if len(falhas) > fracao_maxima_falhas * len(dados):
+            raise RuntimeError(
+                f"{len(falhas)} imagens falharam no pré-processamento."
+            )
+
+        print(
+            f"{len(falhas)} imagens falharam (até {fracao_maxima_falhas:.0%} "
+            "é tolerado) e ficam de fora."
         )
 
     # Confirma se todas as imagens esperadas existem na pasta final
+    nomes_falhas = set(falhas["image"])
+
     imagens_ausentes = [
         nome
         for nome in dados["image"].values
-        if not os.path.isfile(
+        if nome not in nomes_falhas
+        and not os.path.isfile(
             os.path.join(
                 pasta_saida,
                 nome
