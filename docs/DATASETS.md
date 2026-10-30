@@ -71,6 +71,34 @@ Somando DDR, APTOS, BRSET, DeepDRiD e IDRiD, o treino passa de ~82 mil para
   e EyePACS são dados de competição do Kaggle; BRSET e mBRSET têm o termo de
   uso do PhysioNet; IDRiD é CC BY 4.0.
 
+## Licenças e o uso no app
+
+O projeto é de iniciação científica, e o app seria distribuído de graça para
+postos de saúde, sem fins comerciais. Leitura das regras de cada base em
+30/10/2026 (não é parecer jurídico):
+
+| Base | Regra | Pesquisa (IC, artigos) | App gratuito nos postos |
+|---|---|---|---|
+| EyePACS (Kaggle 2015) | "use the Data solely for the purpose and duration of the Competition"; participar não dá licença sobre os dados | Uso acadêmico corrente, mas fora da letra da regra | **Não coberto: pedir autorização à EyePACS** |
+| APTOS 2019 (Kaggle) | "non-commercial purposes only, including (…) academic research and education" | Sim | Sim, enquanto for não comercial |
+| DDR | CC BY-NC-SA 4.0; uso comercial só com autorização dos autores | Sim, citando o artigo | Sim, sem cobrança; o modelo distribuído deve seguir a mesma licença (BY-NC-SA) |
+| IDRiD | CC BY 4.0 | Sim, citando | Sim |
+| DeepDRiD | CC BY-SA 4.0 | Sim, citando | Sim; o modelo distribuído deve seguir a mesma licença (BY-SA) |
+| Messidor-2 | Grátis para pesquisa e ensino; cópia, redistribuição e uso comercial não autorizado proibidos | Sim (só validação, sem redistribuir as fotos) | Não entra no treino, então não pesa |
+| BRSET, mBRSET | Licença de dados credenciados do PhysioNet | Conferir ao ganhar acesso | Conferir ao ganhar acesso |
+
+- **"Não comercial" não depende só de ser grátis:** a Creative Commons olha o
+  uso, e a ONG ou o governo podem fazer uso comercial. Sem cobrança, sem
+  anúncio e sem contrato pago, a distribuição nos postos é não comercial.
+- **O ponto fraco é o EyePACS,** que é a maior parte do treino hoje. Antes de o
+  app ir para os postos, vale a orientadora ou a instituição pedir à EyePACS,
+  por escrito, autorização para usar os dados da competição de 2015 num
+  aplicativo gratuito de saúde pública.
+- Licenças "SA" (DDR, DeepDRiD): ao publicar o modelo, usar uma licença
+  compatível (CC BY-NC-SA 4.0 cobre as duas) e citar cada base.
+- Uso clínico é outro assunto: software que apoia diagnóstico pode ser
+  regulado pela ANVISA como dispositivo médico, independentemente dos dados.
+
 ## Como baixar direto para o Drive, sem passar pelo PC
 
 Tudo vai para a pasta `Datasets/` da conta pessoal (5 TB), compartilhada só
