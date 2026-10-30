@@ -16,6 +16,13 @@ e 17, ao mesmo tempo na mesma A100. As imagens são processadas uma vez, cada
 treino passa antes por uma fumaça de poucos minutos, e a sessão desliga
 sozinha no fim (também se der erro).
 
+`Rodada5_externos.ipynb` é uma cópia de `notebooks/Treinos_Paralelos.ipynb`
+para o R12 (B0 768 com DDR, APTOS, DeepDRiD e IDRiD no treino), com as
+sementes 42 e 17 numa sessão.
+
+`Caches_768.ipynb` é uma cópia de `notebooks/Preparar_Caches.ipynb` para a
+conta pessoal, só CPU: gera os caches de 768 px que a rodada 5 e o R09 usam.
+
 `R09_final_b0_768.ipynb` é uma cópia de `notebooks/Modelo_Final.ipynb`: mede o
 B0 768 escolhido no teste, uma vez só, e gera os arquivos TFLite. Abre o teste
 (`RETINOPATIA_AVALIAR_TESTE = "1"`); não rode de novo depois de olhar o
