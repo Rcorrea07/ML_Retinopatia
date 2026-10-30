@@ -462,7 +462,8 @@ def carregar_dados_extra(
     em `dados` (o train, de onde saem a validação e o teste do projeto).
 
     Retorna o DataFrame no mesmo formato do treino, com a coluna
-    `pasta_processada` apontando para a pasta das imagens extras.
+    `pasta_processada` apontando para a pasta das imagens extras e a
+    `origem` "EyePACS_extra".
     """
 
     if not os.path.isfile(caminho_rotulos):
@@ -490,6 +491,7 @@ def carregar_dados_extra(
         )
 
     extra["pasta_processada"] = pasta_processada
+    extra["origem"] = "EyePACS_extra"
 
     print(
         f"\nImagens extras: {len(extra)} "
@@ -500,33 +502,41 @@ def carregar_dados_extra(
     _mostrar_distribuicao(extra, "level_original")
 
     return extra[
-        ["image", "level_original", "target", "patient_id", "pasta_processada"]
+        [
+            "image", "level_original", "target", "patient_id",
+            "pasta_processada", "origem"
+        ]
     ]
 
 
 def ampliar_treino(
     df_treino,
-    df_extra,
+    df_adicionais,
     pasta_processada=configuracao.PASTA_IMAGENS_OTIMIZADAS
 ):
     """
-    Junta as imagens extras ao treino. A validação e o teste não mudam.
-    Cada linha guarda em `pasta_processada` a pasta da sua imagem, que o
-    pipeline de dados usa para montar o caminho.
+    Junta ao treino as imagens que só entram nele (extras de 2015 e
+    datasets externos, ver `ambiente_colab.preparar_dados_adicionais`).
+    A validação e o teste não mudam. Cada linha guarda em
+    `pasta_processada` a pasta da sua imagem, que o pipeline de dados usa
+    para montar o caminho, e em `origem` de onde ela veio.
     """
 
     treino = df_treino.copy()
     treino["pasta_processada"] = pasta_processada
+    treino["origem"] = "EyePACS"
 
     ampliado = pd.concat(
-        [treino, df_extra],
+        [treino, df_adicionais],
         ignore_index=True
     )
 
     print(
-        f"\nTREINO ampliado: {len(treino)} + {len(df_extra)} = "
+        f"\nTREINO ampliado: {len(treino)} + {len(df_adicionais)} = "
         f"{len(ampliado)} imagens"
     )
+
+    print(ampliado["origem"].value_counts().to_string())
 
     _mostrar_distribuicao(ampliado, "target")
 
