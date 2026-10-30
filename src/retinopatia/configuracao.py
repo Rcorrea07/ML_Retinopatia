@@ -92,6 +92,32 @@ CAMINHO_ZIP_PRINCIPAL = os.environ.get(
     "/content/drive/MyDrive/Datasets/diabetic-retinopathy-detection.zip"
 )
 
+# Datasets de retinopatia além do EyePACS (docs/DATASETS.md), guardados
+# compactados na pasta Datasets da conta pessoal (5 TB), compartilhada
+# para leitura com a conta do projeto. O notebook Baixar_Datasets, rodado
+# na conta pessoal, baixa direto para ela, sem passar pelo computador.
+PASTA_DATASETS = os.path.dirname(CAMINHO_ZIP_PRINCIPAL)
+
+# Do Kaggle: pasta -> identificador do dataset. O DDR é a cópia já
+# recortada e sem as fotos não graduáveis (licença do original:
+# CC BY-NC-SA 4.0, sem uso comercial); o IDRiD é CC BY 4.0. Do Messidor-2
+# vêm só os rótulos de consenso do Google: as fotos pedem cadastro na
+# ADCIS e ficam para a validação externa.
+DATASETS_KAGGLE = {
+    "DDR": "mariaherrerot/ddrdataset",
+    "IDRiD": "aaryapatel98/indian-diabetic-retinopathy-image-dataset",
+    "Messidor2_rotulos": "google-brain/messidor2-dr-grades",
+}
+
+# De endereços públicos: pasta -> (arquivo, endereço). O DeepDRiD (CC BY-SA
+# 4.0) fica no próprio GitHub, ~1,3 GB.
+DATASETS_URL = {
+    "DeepDRiD": (
+        "DeepDRiD.zip",
+        "https://github.com/deepdrdoc/DeepDRiD/archive/refs/heads/master.zip"
+    ),
+}
+
 PASTA_BASE = "/content/dataset_retinopatia"
 
 PASTA_IMAGENS = os.path.join(
