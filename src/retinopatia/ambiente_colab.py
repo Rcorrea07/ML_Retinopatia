@@ -406,6 +406,98 @@ def preparar_caches():
     print("Caches prontos.")
 
 
+def _credenciais_kaggle():
+    """
+    Passa ao ambiente as credenciais do Kaggle guardadas nos segredos do
+    Colab (ícone de chave na barra lateral): KAGGLE_API_TOKEN, o token
+    novo de Kaggle → Settings → API, ou o par KAGGLE_USERNAME e
+    KAGGLE_KEY do kaggle.json antigo.
+    """
+
+    from google.colab import userdata
+
+    encontradas = []
+
+    for nome in ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"):
+        try:
+            os.environ[nome] = userdata.get(nome)
+            encontradas.append(nome)
+        except (userdata.SecretNotFoundError, userdata.NotebookAccessError):
+            pass
+
+    if not encontradas:
+        raise RuntimeError(
+            "Nenhuma credencial do Kaggle nos segredos do Colab. Crie o "
+            "segredo KAGGLE_API_TOKEN (chave na barra lateral) com o token "
+            "de Kaggle → Settings → API e ative o acesso deste notebook."
+        )
+
+
+def baixar_do_kaggle(identificador, pasta_destino):
+    """
+    Baixa um dataset do Kaggle direto para uma pasta do Drive, sem
+    descompactar (o zip fica como veio).
+    """
+
+    _credenciais_kaggle()
+
+    # A versão do Colab pode não conhecer o token novo
+    _executar("pip install -q -U kaggle")
+
+    os.makedirs(pasta_destino, exist_ok=True)
+
+    _executar(f'kaggle datasets download -d {identificador} -p "{pasta_destino}"')
+
+
+def baixar_url_para_drive(url, caminho_destino):
+    """
+    Baixa um arquivo de um endereço público direto para o Drive.
+    """
+
+    os.makedirs(os.path.dirname(caminho_destino), exist_ok=True)
+
+    _executar(f'curl -L --fail -sS -o "{caminho_destino}" "{url}"')
+
+
+def baixar_datasets_externos(pasta=configuracao.PASTA_DATASETS):
+    """
+    Baixa os datasets de `configuracao.DATASETS_KAGGLE` e
+    `configuracao.DATASETS_URL`, cada um na sua subpasta de `pasta`.
+    Pula os que já estão lá, então pode rodar de novo se cair no meio.
+    """
+
+    for nome, identificador in configuracao.DATASETS_KAGGLE.items():
+        destino = os.path.join(pasta, nome)
+
+        if os.path.isdir(destino) and os.listdir(destino):
+            print(f"{nome}: já baixado em {destino}")
+            continue
+
+        print(f"{nome}: baixando {identificador} do Kaggle...")
+        baixar_do_kaggle(identificador, destino)
+
+    for nome, (arquivo, url) in configuracao.DATASETS_URL.items():
+        destino = os.path.join(pasta, nome, arquivo)
+
+        if os.path.isfile(destino) and os.path.getsize(destino) > 0:
+            print(f"{nome}: já baixado em {destino}")
+            continue
+
+        print(f"{nome}: baixando {url}...")
+        baixar_url_para_drive(url, destino)
+
+    print("\nNa pasta de datasets:")
+
+    for nome in sorted(os.listdir(pasta)):
+        caminho = os.path.join(pasta, nome)
+        arquivos = (
+            [os.path.join(caminho, f) for f in os.listdir(caminho)]
+            if os.path.isdir(caminho) else [caminho]
+        )
+        tamanho = sum(os.path.getsize(f) for f in arquivos if os.path.isfile(f))
+        print(f"  {nome}: {tamanho / 1e9:.2f} GB")
+
+
 def baixar_arquivo(caminho):
     """
     Baixa um arquivo do Colab para a máquina do usuário.
