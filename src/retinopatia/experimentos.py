@@ -123,6 +123,22 @@ EXPERIMENTOS = {
         "TAMANHO_IMAGEM": (768, 768),
         "MODO_TTA": "tta2",
     },
+
+    # --------------------------------------------------------
+    # Rodada 5: datasets externos no treino (docs/DATASETS.md). O R09
+    # espera por ela: o modelo final sai do melhor entre R10 e R12.
+    # --------------------------------------------------------
+
+    # O B0 768 (R10) com ~19 mil fotos de outras câmeras e países: DDR
+    # (China), APTOS (Índia), DeepDRiD (China, só as fotos de qualidade
+    # aceita) e IDRiD (Índia). Validação e teste continuam os do EyePACS,
+    # para comparar com o R10 nas mesmas duas sementes. Fonte: 1º lugar
+    # APTOS 2019 (treino com os dados de 2015 e o IDRiD juntos).
+    "R12_b0_768_externos": {
+        "BACKBONE": "EfficientNetB0",
+        "TAMANHO_IMAGEM": (768, 768),
+        "DATASETS_EXTERNOS": ["DDR", "APTOS", "DeepDRiD", "IDRiD"],
+    },
 }
 
 

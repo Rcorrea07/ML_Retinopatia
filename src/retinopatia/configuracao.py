@@ -368,10 +368,84 @@ CAMINHO_LISTA_SUSPEITAS_EXTRA = os.path.join(
     f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}{_SUFIXO_TAMANHO}_extra.csv"
 )
 
-# Sufixo dos nomes de experimento e de modelo quando os dados extras
-# são usados (os resultados não se misturam com os treinos só com o
-# train)
-SUFIXO_DADOS = "_extra" if USAR_DADOS_EXTRA else ""
+# ============================================================
+# DATASETS EXTERNOS (DDR, APTOS, DeepDRiD, IDRiD; só para o treino)
+# ============================================================
+
+# Datasets de outros países e câmeras (docs/DATASETS.md), na pasta
+# Datasets do Drive, cada um no zip em que foi baixado (notebook
+# Baixar_Datasets). Como as fotos extras de 2015, entram só no treino:
+# a validação e o teste continuam os do EyePACS. O experimento escolhe
+# quais usar, pelos nomes abaixo.
+ZIPS_DATASETS_EXTERNOS = {
+    "DDR": os.path.join(PASTA_DATASETS, "DDR", "ddrdataset.zip"),
+    "APTOS": os.path.join(
+        PASTA_DATASETS,
+        "aptos2019-blindness-detection.zip"
+    ),
+    "DeepDRiD": os.path.join(PASTA_DATASETS, "DeepDRiD", "DeepDRiD.zip"),
+    "IDRiD": os.path.join(
+        PASTA_DATASETS,
+        "IDRiD",
+        "indian-diabetic-retinopathy-image-dataset.zip"
+    ),
+}
+
+DATASETS_EXTERNOS = list(_valor("DATASETS_EXTERNOS", []))
+
+_EXTERNOS_DESCONHECIDOS = set(DATASETS_EXTERNOS) - set(ZIPS_DATASETS_EXTERNOS)
+
+if _EXTERNOS_DESCONHECIDOS:
+    raise ValueError(
+        f"Datasets externos desconhecidos: {sorted(_EXTERNOS_DESCONHECIDOS)}. "
+        f"Opções: {sorted(ZIPS_DATASETS_EXTERNOS)}"
+    )
+
+# Fotos originais tiradas dos zips, apagadas depois de processadas
+PASTA_EXTERNOS_BRUTOS = "/content/datasets_externos"
+
+# Pasta das imagens processadas, zips do cache e lista de máscaras
+# suspeitas de cada dataset, nos mesmos lugares dos do EyePACS
+PASTAS_IMAGENS_EXTERNAS = {
+    nome: f"{PASTA_IMAGENS_OTIMIZADAS}_{nome.lower()}"
+    for nome in ZIPS_DATASETS_EXTERNOS
+}
+
+CAMINHOS_ZIP_CACHE_EXTERNOS = {
+    nome: [
+        os.path.join(pasta_cache, os.path.basename(pasta) + ".zip")
+        for pasta_cache in (PASTA_CACHE_COMPARTILHADA, PASTA_CACHE_DRIVE)
+    ]
+    for nome, pasta in PASTAS_IMAGENS_EXTERNAS.items()
+}
+
+CAMINHOS_LISTA_SUSPEITAS_EXTERNOS = {
+    nome: os.path.join(
+        _PASTA_LISTAS,
+        f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}{_SUFIXO_TAMANHO}"
+        f"_{nome.lower()}.csv"
+    )
+    for nome in ZIPS_DATASETS_EXTERNOS
+}
+
+# No DeepDRiD o grau é dado por olho, não por foto: as duas fotos do
+# mesmo olho levam o mesmo grau, e numa foto recusada pela nota de
+# qualidade ("Overall quality" 0, mais da metade delas) as lesões podem
+# não aparecer. Entram só as fotos com nota de qualidade aceita (1).
+QUALIDADE_MINIMA_DEEPDRID = 1
+
+# Fração das fotos de um dataset externo que pode falhar no
+# pré-processamento (fotos ilegíveis ou sem retina) e ficar fora do
+# treino; acima dela a execução para, como no EyePACS
+FRACAO_MAXIMA_FALHAS_EXTERNOS = 0.01
+
+# Sufixo dos nomes de experimento e de modelo quando os dados extras ou
+# os datasets externos são usados (os resultados não se misturam com os
+# treinos só com o train). A lista dos externos fica no configuracao.json.
+SUFIXO_DADOS = (
+    ("_extra" if USAR_DADOS_EXTRA else "")
+    + ("_externos" if DATASETS_EXTERNOS else "")
+)
 
 # Quantidade de imagens mostradas na inspeção visual
 NUMERO_AMOSTRAS_INSPECAO = 20
@@ -801,6 +875,12 @@ if _NAO_APLICADAS:
 if MODELO_PARES and DESTILACAO:
     raise ValueError(
         "Destilação e modelo de pares ainda não foram implementados juntos."
+    )
+
+# O professor lê as imagens dos caches de 448 do EyePACS
+if DATASETS_EXTERNOS and DESTILACAO:
+    raise ValueError(
+        "Destilação e datasets externos ainda não foram implementados juntos."
     )
 
 # Constantes mudadas por este experimento, gravadas no configuracao.json

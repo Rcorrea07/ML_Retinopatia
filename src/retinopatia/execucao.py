@@ -41,9 +41,9 @@ PASTA_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def preparar_imagens():
     """
     Deixa no disco local as imagens processadas do tamanho do experimento
-    atual (train e, com os dados extras, o test de 2015). São as mesmas
-    etapas de preparação do notebook de treino: restaura o cache se
-    houver, senão extrai e processa.
+    atual (train e, se o experimento os usa, o test de 2015 e os datasets
+    externos). São as mesmas etapas de preparação do notebook de treino:
+    restaura o cache se houver, senão extrai e processa.
     """
 
     from . import conjunto_dados, pre_processamento
@@ -56,10 +56,7 @@ def preparar_imagens():
 
     pre_processamento.pre_processar_dataset(dados)
 
-    if configuracao.USAR_DADOS_EXTRA:
-        df_extra = conjunto_dados.carregar_dados_extra(dados)
-
-        ambiente_colab.preparar_imagens_extra(df_extra)
+    ambiente_colab.preparar_dados_adicionais(dados)
 
 
 def _memoria_total_gb():
@@ -394,6 +391,12 @@ def executar_experimento():
             configuracao.CAMINHOS_ZIP_CACHE_EXTRA
         ))
 
+    for nome in configuracao.DATASETS_EXTERNOS:
+        pastas.append((
+            configuracao.PASTAS_IMAGENS_EXTERNAS[nome],
+            configuracao.CAMINHOS_ZIP_CACHE_EXTERNOS[nome]
+        ))
+
     for pasta, caminhos_zip in pastas:
         if not ambiente_colab.restaurar_cache_imagens(pasta, caminhos_zip):
             raise RuntimeError(
@@ -405,9 +408,11 @@ def executar_experimento():
 
     dados, df_treino, df_val, df_teste = conjunto_dados.preparar_dataset()
 
-    if configuracao.USAR_DADOS_EXTRA:
-        df_extra = conjunto_dados.carregar_dados_extra(dados)
-        df_treino = conjunto_dados.ampliar_treino(df_treino, df_extra)
+    # As imagens já estão no disco: aqui só as tabelas são montadas
+    df_adicionais = ambiente_colab.preparar_dados_adicionais(dados)
+
+    if df_adicionais is not None:
+        df_treino = conjunto_dados.ampliar_treino(df_treino, df_adicionais)
 
     df_treino, df_val, df_teste = treinamento.preparar_conjuntos_experimento(
         df_treino,

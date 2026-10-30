@@ -3,8 +3,8 @@ Cola específica do Google Colab.
 
 Este módulo concentra tudo que só funciona dentro do Colab: montagem do
 Google Drive, extração do dataset (train e, para o treino ampliado, o
-test de 2015), cache das imagens processadas no Drive e download de
-arquivos. O restante do pacote não depende do Colab.
+test de 2015 e os datasets externos), cache das imagens processadas no
+Drive e download de arquivos. O restante do pacote não depende do Colab.
 
 Observação: no notebook original a extração usava os atalhos de shell do
 IPython (`!unzip`, `!cat`), que não existem em um arquivo `.py`. Aqui os
@@ -16,6 +16,7 @@ silenciosamente mais adiante.
 import os
 import shutil
 import subprocess
+import zipfile
 
 from . import configuracao
 
@@ -228,6 +229,91 @@ def preparar_imagens_extra(
     salvar_cache_imagens(pasta_saida, caminhos_zip_cache[0])
 
 
+def preparar_imagens_externas(nome, tabela):
+    """
+    Deixa prontas as fotos processadas de um dataset externo
+    (`datasets_externos.carregar_dataset_externo`): usa o cache do Drive
+    se existir; senão tira do zip só as fotos da tabela, processa com o
+    mesmo pré-processamento do EyePACS e, no notebook Preparar_Caches,
+    salva o cache no Drive.
+
+    Retorna a tabela só com as fotos processadas: as que falharam (até
+    `FRACAO_MAXIMA_FALHAS_EXTERNOS`) ficam fora do treino.
+    """
+
+    from . import datasets_externos, pre_processamento
+
+    pasta_saida = configuracao.PASTAS_IMAGENS_EXTERNAS[nome]
+    caminhos_zip_cache = configuracao.CAMINHOS_ZIP_CACHE_EXTERNOS[nome]
+
+    if not restaurar_cache_imagens(pasta_saida, caminhos_zip_cache):
+        pasta_bruta = os.path.join(configuracao.PASTA_EXTERNOS_BRUTOS, nome)
+
+        print(f"Extraindo {len(tabela)} fotos do {nome}...")
+
+        caminho_zip = configuracao.ZIPS_DATASETS_EXTERNOS[nome]
+
+        with zipfile.ZipFile(caminho_zip) as arquivo_zip:
+            arquivo_zip.extractall(
+                pasta_bruta,
+                members=tabela["membro"].tolist()
+            )
+
+        pre_processamento.pre_processar_dataset(
+            tabela,
+            pasta_imagens=pasta_bruta,
+            pasta_saida=pasta_saida,
+            caminho_lista_suspeitas=(
+                configuracao.CAMINHOS_LISTA_SUSPEITAS_EXTERNOS[nome]
+            ),
+            coluna_entrada="membro",
+            fracao_maxima_falhas=configuracao.FRACAO_MAXIMA_FALHAS_EXTERNOS
+        )
+
+        salvar_cache_imagens(pasta_saida, caminhos_zip_cache[0])
+
+        shutil.rmtree(pasta_bruta, ignore_errors=True)
+
+    return datasets_externos.manter_processadas(tabela, pasta_saida)
+
+
+def preparar_dados_adicionais(dados):
+    """
+    Fotos que entram só no treino, já processadas no disco: as extras de
+    2015 (`USAR_DADOS_EXTRA`) e os datasets externos do experimento
+    (`DATASETS_EXTERNOS`). Cada parte usa o seu cache do Drive se existir,
+    senão é processada nesta sessão.
+
+    Retorna a tabela delas, para `conjunto_dados.ampliar_treino`, ou None
+    se o experimento não usa nenhuma.
+    """
+
+    import pandas as pd
+
+    from . import conjunto_dados, datasets_externos
+
+    partes = []
+
+    if configuracao.USAR_DADOS_EXTRA:
+        df_extra = conjunto_dados.carregar_dados_extra(dados)
+
+        preparar_imagens_extra(df_extra)
+
+        partes.append(df_extra)
+
+    for nome in configuracao.DATASETS_EXTERNOS:
+        tabela = datasets_externos.carregar_dataset_externo(nome)
+
+        partes.append(
+            preparar_imagens_externas(nome, tabela).drop(columns="membro")
+        )
+
+    if not partes:
+        return None
+
+    return pd.concat(partes, ignore_index=True)
+
+
 def restaurar_cache_imagens(
     pasta_imagens_otimizadas=configuracao.PASTA_IMAGENS_OTIMIZADAS,
     caminhos_zip_cache=configuracao.CAMINHOS_ZIP_CACHE
@@ -343,16 +429,18 @@ def salvar_cache_imagens(
 def preparar_caches():
     """
     Gera os caches de imagens processadas do tamanho do experimento
-    ativo (train e extras) e grava os zips na pasta compartilhada. É a
-    função do notebook Preparar_Caches, rodado com o Drive pessoal do
-    responsável montado e RETINOPATIA_GRAVAR_CACHE=1.
+    ativo (datasets externos, train e extras) e grava os zips na pasta
+    compartilhada. É a função do notebook Preparar_Caches, rodado com o
+    Drive pessoal do responsável montado e RETINOPATIA_GRAVAR_CACHE=1.
 
     Processa todas as imagens do train (não só as do treino do
     projeto), para que o mesmo cache sirva a qualquer experimento com
-    esse tamanho. Um cache que já existe no Drive não é refeito.
+    esse tamanho. Um cache que já existe no Drive não é refeito. Os
+    externos vêm primeiro: são pequenos e ficam salvos mesmo se a sessão
+    cair no meio do EyePACS (~88 GB de fotos originais).
     """
 
-    from . import conjunto_dados, pre_processamento
+    from . import conjunto_dados, datasets_externos, pre_processamento
 
     if not configuracao.GRAVAR_CACHE:
         raise RuntimeError(
@@ -366,6 +454,24 @@ def preparar_caches():
         f"{configuracao.EROSAO_MASCARA}) em "
         f"{configuracao.PASTA_CACHE_COMPARTILHADA}"
     )
+
+    for nome in configuracao.DATASETS_EXTERNOS:
+        caminho_zip_cache = configuracao.CAMINHOS_ZIP_CACHE_EXTERNOS[nome][0]
+
+        if os.path.isfile(caminho_zip_cache):
+            print(f"O cache do {nome} já existe: {caminho_zip_cache}")
+            continue
+
+        preparar_imagens_externas(
+            nome,
+            datasets_externos.carregar_dataset_externo(nome)
+        )
+
+        # Libera o disco para o EyePACS
+        shutil.rmtree(
+            configuracao.PASTAS_IMAGENS_EXTERNAS[nome],
+            ignore_errors=True
+        )
 
     extrair_rotulos()
 
