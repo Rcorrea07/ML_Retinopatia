@@ -59,6 +59,8 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
 | R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
 | R11 s17 | 4 | V2-B0 em 768 px, semente 17 | 0,769 | 0,765 | 0,757 | 0,931 | 0,843 |
+| R12 | 5 | B0 768 com os datasets externos no treino, semente 42 | | | | | |
+| R12 s17 | 5 | R12 com semente 17 | | | | | |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -236,6 +238,30 @@ sozinha ao terminar.
 Diferenças de cerca de 0,02 a 0,03 na especificidade ficam dentro do ruído de
 uma semente só (cerca de 1.200 pacientes sem a doença na validação). Os
 finalistas são repetidos com outras sementes antes da decisão.
+
+### Rodada 5 (preparada em 30/10/2026): datasets externos
+
+Antes de medir o teste (R09), o B0 768 treina também com quatro datasets
+abertos de outras câmeras e países (lista, contagens e licenças em
+[DATASETS.md](DATASETS.md)): DDR, APTOS, DeepDRiD e IDRiD, 17.631 fotos, só
+no treino. A validação e o teste continuam os do EyePACS, para comparar com o
+R10 nas mesmas sementes. O R09 mede no teste o melhor entre R10 e R12.
+
+1. **Caches de 768 px, de graça.** `notebooks/execucoes/Caches_768.ipynb` no
+   Colab grátis da conta pessoal (só CPU): grava em `ProjetoRetinopatia_caches`
+   os zips dos quatro externos, do train e das extras de 2015. Começou em
+   30/10 por volta de 00:50; leva de 6 a 8 h com 2 núcleos. Na rodada 4, só
+   processar as imagens de 768 px custou ~2 h de A100 (~13 unidades).
+2. **Acesso da conta do projeto.** Compartilhar `ProjetoRetinopatia_caches`
+   (e, se ainda não estiver, a pasta `Datasets`) com a conta do projeto como
+   Leitor e criar o atalho em "Meu Drive" dela.
+3. **Treinos.** `notebooks/execucoes/Rodada5_externos.ipynb` numa sessão A100
+   com RAM alta: R12 com as sementes 42 e 17 ao mesmo tempo, fumaça antes,
+   desliga sozinha. Com ~22% mais fotos por época, a estimativa é de 7 a 9 h
+   (~50 a 60 unidades, de 430).
+
+Sem os caches a rodada também roda, processando as imagens na sessão (~2,5 h
+a mais).
 
 ## Final
 
