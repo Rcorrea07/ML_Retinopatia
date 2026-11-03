@@ -54,7 +54,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
 | R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | 0,753 | 0,759 | 0,738 | 0,924 | 0,835 |
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
-| R09 | final | B0 768 (R10, semente 42): teste uma vez, com TTA2, e TFLite | | | | | |
+| R09 | final | B0 768 com externos (R12, semente 42): teste uma vez, com TTA2, e TFLite | | | | | |
 | R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
 | R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
 | R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
@@ -296,10 +296,10 @@ Por semente, R12: especificidade por paciente sem TTA 0,758 (s42) e 0,766
 (estimativa por 6,8 unidades/h; saldo de ~374, a conferir no Colab).
 
 **Leitura:** o R12 empata com o R10 por paciente e é melhor por olho e na
-cabeça de grau, sem custo no celular. É o candidato natural para o R09 (no
-lugar do R10). Hoje o R09 aponta para o R10 semente 42
-(`CAMINHO_MODELO_ESCOLHIDO`); trocar exige escolher a semente e o modo de TTA
-pela validação. Modelos salvos em `modelos/`:
+cabeça de grau, sem custo no celular. Por isso vai para o R09 no lugar do
+R10 (03/11): semente 42 com TTA2, pela mesma regra que tinha escolhido o R10
+(maior especificidade por paciente na validação com TTA2: 0,801 contra 0,782
+da semente 17). Modelos salvos em `modelos/`:
 `R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras`
 (s42) e `..._extra_externos_seed17_ec4e460_20261102_1741.keras` (s17).
 
@@ -316,10 +316,12 @@ pela validação. Modelos salvos em `modelos/`:
 `src/retinopatia/modelo_final.py`), numa sessão A100 com RAM alta, uma vez só:
 
 1. Processa só as imagens da validação e do teste em 768 px (~7 mil).
-2. Carrega o B0 768 escolhido: R10 com semente 42, a de maior especificidade
-   por paciente na validação com TTA2 (0,790 contra 0,785 da semente 17).
-3. Escolhe os limiares na validação com TTA2, o melhor modo nas duas sementes
-   do B0 768, e mede o teste uma única vez. Os três modos (sem TTA, TTA2 e
+2. Carrega o B0 768 escolhido: R12 (com os datasets externos no treino) com
+   semente 42, a de maior especificidade por paciente na validação com TTA2
+   (0,801 contra 0,782 da semente 17).
+3. Escolhe os limiares na validação com TTA2, o melhor modo na média das duas
+   sementes do R12 (0,792, contra 0,777 com TTA4 e 0,762 sem TTA), e mede o
+   teste uma única vez. Os três modos (sem TTA, TTA2 e
    TTA4) também são medidos, cada um com o seu limiar da validação, para
    decidir quantas passagens pela rede o celular faz.
 4. Gera `modelos/tflite/<modelo>_{fp32,fp16,int8}.tflite`: entrada float32
