@@ -27,3 +27,8 @@ conta pessoal, só CPU: gera os caches de 768 px que a rodada 5 e o R09 usam.
 B0 768 escolhido no teste, uma vez só, e gera os arquivos TFLite. Abre o teste
 (`RETINOPATIA_AVALIAR_TESTE = "1"`); não rode de novo depois de olhar o
 resultado.
+
+`R09_tflite_b0_768.ipynb` refaz só a conversão para TFLite do modelo
+escolhido, com o teste fechado (`RETINOPATIA_AVALIAR_TESTE = "0"`,
+`modelo_final.rodar_tflite`). Foi criado porque a exportação do R09 de 03/11
+parou depois da medida do teste; o teste não é medido de novo.
