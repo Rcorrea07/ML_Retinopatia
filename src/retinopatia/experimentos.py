@@ -113,9 +113,10 @@ EXPERIMENTOS = {
     # Final (R09): sem treino. O B0 768 escolhido
     # (CAMINHO_MODELO_ESCOLHIDO) medido uma vez no teste e convertido
     # para TFLite, pelo notebook Modelo_Final (modelo_final.rodar_final).
-    # TTA2 teve a maior especificidade por paciente na validação nas
-    # duas sementes do B0 768 (0,790 e 0,785, contra 0,780 e 0,765 com
-    # TTA4); o teste mede os três modos.
+    # O escolhido é o R12 semente 42. TTA2 teve a maior especificidade
+    # por paciente na validação na média das duas sementes do R12 (0,792,
+    # contra 0,777 com TTA4 e 0,762 sem TTA) e na semente 42 (0,801
+    # contra 0,766 com TTA4); o teste mede os três modos.
     # --------------------------------------------------------
 
     "R09_final_b0_768": {
@@ -125,8 +126,8 @@ EXPERIMENTOS = {
     },
 
     # --------------------------------------------------------
-    # Rodada 5: datasets externos no treino (docs/DATASETS.md). O R09
-    # espera por ela: o modelo final sai do melhor entre R10 e R12.
+    # Rodada 5: datasets externos no treino (docs/DATASETS.md). O modelo
+    # final (R09) saiu do melhor entre R10 e R12: o R12.
     # --------------------------------------------------------
 
     # O B0 768 (R10) com ~19 mil fotos de outras câmeras e países: DDR
