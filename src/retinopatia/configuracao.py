@@ -809,15 +809,16 @@ PASTA_IMAGENS_PROFESSOR = "/content/dataset_retina_v3_448"
 # MODELO FINAL ESCOLHIDO (R09, modelo_final.py)
 # ============================================================
 
-# B0 768 (R10): o melhor por olho nas duas sementes e empatado por
-# paciente com os outros candidatos, e mais leve no celular que a V2-B0.
-# Das duas sementes, a de maior especificidade por paciente na validação
-# com TTA2 (0,790 contra 0,785).
+# B0 768 com os datasets externos no treino (R12): empatado por paciente
+# com o B0 768 só com EyePACS (R10), melhor por olho e na cabeça de grau
+# nas duas sementes, com o mesmo custo no celular. Das duas sementes, a de
+# maior especificidade por paciente na validação com TTA2 (0,801 contra
+# 0,782), a mesma regra que tinha escolhido o R10 semente 42.
 CAMINHO_MODELO_ESCOLHIDO = _valor(
     "CAMINHO_MODELO_ESCOLHIDO",
     os.path.join(
         PASTA_MODELOS,
-        "R10_b0_768_B0_768_v3_extra_c35c12a_20261027_1920.keras"
+        "R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras"
     )
 )
 
