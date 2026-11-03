@@ -146,7 +146,7 @@ class EscolhaDeExperimento(unittest.TestCase):
         self.assertEqual(final["modo_tta"], "tta2")
         self.assertEqual(final["tamanho"], [768, 768])
         self.assertTrue(final["teste"])
-        self.assertIn("R10_b0_768", final["modelo_escolhido"])
+        self.assertIn("R12_b0_768_externos", final["modelo_escolhido"])
 
     def test_externos_tem_pasta_e_cache_proprios_e_nome_proprio(self):
         r10 = resolver("R10_b0_768")
