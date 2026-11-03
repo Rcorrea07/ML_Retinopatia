@@ -60,11 +60,12 @@ def _conversor_tflite(pasta_savedmodel, formato):
     return conversor
 
 
-def preparar_imagens_avaliacao():
+def preparar_imagens_avaliacao(incluir_teste=True):
     """
-    Extrai as fotos do train e processa só as da validação e do teste,
-    no tamanho do experimento. A lista de máscaras suspeitas vai para a
-    pasta desta execução, sem sobrescrever a do treino.
+    Extrai as fotos do train e processa só as da validação e do teste
+    (sem `incluir_teste`, só as da validação), no tamanho do experimento.
+    A lista de máscaras suspeitas vai para a pasta desta execução, sem
+    sobrescrever a do treino.
 
     Retorna:
         (df_val, df_teste)
@@ -79,7 +80,7 @@ def preparar_imagens_avaliacao():
     _, _, df_val, df_teste = conjunto_dados.preparar_dataset()
 
     pre_processamento.pre_processar_dataset(
-        pd.concat([df_val, df_teste]),
+        pd.concat([df_val, df_teste]) if incluir_teste else df_val,
         caminho_lista_suspeitas=os.path.join(
             configuracao.PASTA_RESULTADOS,
             "mascaras_suspeitas_validacao_teste.csv"
@@ -317,6 +318,36 @@ def rodar_final(desligar_ao_terminar=True):
         tabela_tflite = exportar_tflite(modelo, df_val)
 
         return resultado_validacao, resultado_teste, tabela_tflite
+
+    finally:
+        if desligar_ao_terminar:
+            ambiente_colab.desligar_ambiente()
+
+
+def rodar_tflite(
+    caminho_modelo=configuracao.CAMINHO_MODELO_ESCOLHIDO,
+    desligar_ao_terminar=True
+):
+    """
+    Só a conversão para TFLite do modelo escolhido, sem abrir o teste:
+    para quando o teste já foi medido e a exportação falhou ou precisa
+    ser refeita. Processa só as imagens da validação, usadas na
+    conferência de paridade.
+
+    Retorna:
+        a tabela de paridade
+    """
+
+    try:
+        df_val, _ = preparar_imagens_avaliacao(incluir_teste=False)
+
+        print(f"Modelo convertido: {caminho_modelo}")
+
+        modelo = carregar_modelo_salvo(caminho_modelo)
+
+        utilitarios.salvar_configuracao()
+
+        return exportar_tflite(modelo, df_val, caminho_modelo=caminho_modelo)
 
     finally:
         if desligar_ao_terminar:

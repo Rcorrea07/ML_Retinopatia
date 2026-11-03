@@ -342,11 +342,16 @@ def construir_modelo_inferencia(
     pares nem destilação): sem o bloco de augmentation, toda em float32
     e com uma saída só, [probabilidade de retinopatia, grau previsto].
 
-    A rede é montada de novo em float32 (sem baixar os pesos da
-    ImageNet) e recebe os pesos do modelo treinado camada a camada: a
-    precisão mista e as camadas aleatórias do augmentation atrapalham a
-    conversão para TFLite. A entrada continua a imagem processada em
-    0–255 (`pre_processamento.processar_retina`).
+    A rede é montada de novo em float32 e recebe os pesos do modelo
+    treinado camada a camada: a precisão mista e as camadas aleatórias do
+    augmentation atrapalham a conversão para TFLite. A entrada continua a
+    imagem processada em 0–255 (`pre_processamento.processar_retina`).
+
+    A rede base é montada com weights="imagenet", como no treino, mesmo
+    que esses pesos sejam trocados logo depois: com weights=None, a
+    EfficientNet do Keras deixa de fora a camada que divide a entrada
+    pelo desvio padrão da ImageNet, que não tem pesos. A cópia passa, mas
+    a rede prevê outra coisa (diferença de 0,81 no primeiro R09).
     """
 
     politica = tf.keras.mixed_precision.global_policy()
@@ -354,7 +359,7 @@ def construir_modelo_inferencia(
 
     try:
         modelo_base = BACKBONES[nome_backbone](
-            weights=None,
+            weights="imagenet",
             include_top=False,
             input_shape=formato_entrada
         )
@@ -381,6 +386,18 @@ def construir_modelo_inferencia(
         camada for camada in extrator.layers
         if isinstance(camada, models.Model) and camada.name != "aumento_dados"
     )
+
+    # Camadas sem pesos não entram no set_weights: a arquitetura é
+    # conferida à parte, camada a camada
+    tipos_inferencia = [type(camada).__name__ for camada in modelo_base.layers]
+    tipos_treinada = [type(camada).__name__ for camada in base_treinada.layers]
+
+    if tipos_inferencia != tipos_treinada:
+        raise ValueError(
+            f"A rede base de inferência tem {len(tipos_inferencia)} camadas e "
+            f"a treinada {len(tipos_treinada)}, ou em outra ordem: as duas "
+            "precisam ser montadas do mesmo jeito."
+        )
 
     modelo_base.set_weights(base_treinada.get_weights())
     inferencia.get_layer("gem").set_weights(extrator.get_layer("gem").get_weights())
