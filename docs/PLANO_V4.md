@@ -59,8 +59,8 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
 | R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
 | R11 s17 | 4 | V2-B0 em 768 px, semente 17 | 0,769 | 0,765 | 0,757 | 0,931 | 0,843 |
-| R12 | 5 | B0 768 com os datasets externos no treino, semente 42 | | | | | |
-| R12 s17 | 5 | R12 com semente 17 | | | | | |
+| R12 | 5 | B0 768 com os datasets externos no treino, semente 42 | 0,758 | 0,801 | 0,766 | 0,928 | 0,841 |
+| R12 s17 | 5 | R12 com semente 17 | 0,766 | 0,782 | 0,788 | 0,928 | 0,836 |
 
 ### Leva 1 (22/10/2026, commit `3e3dfd9`, 3 sessões A100 em paralelo)
 
@@ -262,6 +262,46 @@ R10 nas mesmas sementes. O R09 mede no teste o melhor entre R10 e R12.
 
 Sem os caches a rodada também roda, processando as imagens na sessão (~2,5 h
 a mais).
+
+### Rodada 5 (02 a 03/11/2026, commit `ec4e460`, uma sessão, 2 treinos juntos)
+
+R12 com as sementes 42 e 17 ao mesmo tempo, restaurando os caches de 768 px
+(sem processar imagens na sessão). Validação; médias das sementes 42 e 17,
+comparadas com o R10 nas mesmas sementes:
+
+| Configuração | Paciente: ROC · espec. sem TTA | Paciente, TTA2: ROC · espec. | Paciente, TTA4: ROC · espec. | Kappa | Olho, TTA4: ROC · espec. | Saudáveis marcados (olho) | Grau 1 detectado |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| B0 768 (R10) | 0,927 · 0,752 | 0,929 · 0,788 | 0,931 · 0,772 | 0,830 | 0,938 · 0,782 | 21,8% | 68–69% |
+| **B0 768 + externos (R12)** | 0,928 · 0,762 | 0,930 · 0,792 | 0,930 · 0,777 | 0,839 | 0,937 · **0,807** | **19,3%** | 69% |
+
+Por semente, R12: especificidade por paciente sem TTA 0,758 (s42) e 0,766
+(s17); TTA2 0,801 e 0,782; TTA4 0,766 e 0,788; por olho, TTA4, 0,795 e 0,819
+(R10: 0,782 e 0,783). Saudáveis marcados por olho: 20,5% e 18,1% (R10: 21,8% e
+21,7%).
+
+- **Por paciente, empate:** ROC-AUC igual (0,928 a 0,930) e especificidade de
+  0,4 a 1,0 ponto acima do R10, dentro do ruído de semente.
+- **Por olho, ganho nas duas sementes:** especificidade de 0,782 para 0,807
+  (+2,5 pontos; +1,3 na s42 e +3,6 na s17) e falsos positivos de 21,8% para
+  19,3% dos olhos saudáveis, com a mesma ROC-AUC.
+- **Cabeça de grau melhor:** kappa de 0,830 para 0,839, perto da V2-B0 (0,843).
+- **O grau 1 não mudou:** 69,2 e 69,6% (graus 2 a 4: 95,8 a 100%).
+- **Mesmo custo no celular** (a rede é a mesma B0 768). O ganho dos dados de
+  outras câmeras ainda não foi medido fora do EyePACS (validação externa).
+- **Treino:** 12 épocas, melhor época na última (PR-AUC de validação 0,896, ainda
+  subindo pouco); 12,7 GB de GPU por treino e 45 GB de RAM com os dois juntos;
+  7,9 h cada, simultâneos.
+
+**Custo:** sessão de ~8,2 h (17:41 a ~01:50 UTC), cerca de 56 unidades
+(estimativa por 6,8 unidades/h; saldo de ~374, a conferir no Colab).
+
+**Leitura:** o R12 empata com o R10 por paciente e é melhor por olho e na
+cabeça de grau, sem custo no celular. É o candidato natural para o R09 (no
+lugar do R10). Hoje o R09 aponta para o R10 semente 42
+(`CAMINHO_MODELO_ESCOLHIDO`); trocar exige escolher a semente e o modo de TTA
+pela validação. Modelos salvos em `modelos/`:
+`R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras`
+(s42) e `..._extra_externos_seed17_ec4e460_20261102_1741.keras` (s17).
 
 ## Final
 
