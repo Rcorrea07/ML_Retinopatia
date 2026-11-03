@@ -54,7 +54,7 @@ rodadas 2 e 3 são definidas depois de ver a anterior.
 | R06 | 2 | B0 640 com treino mais longo (18 épocas na Fase 2) | 0,755 | 0,723 | 0,715 | 0,926 | 0,830 |
 | R07 | 3 | R02 (B0 640) com semente 17 (mesmo split) | 0,753 | 0,759 | 0,738 | 0,924 | 0,835 |
 | R08 | 3 | R05 (V2-B0 640) com semente 17 (mesmo split) | 0,771 | 0,756 | 0,785 | 0,928 | 0,838 |
-| R09 | final | B0 768 com externos (R12, semente 42): teste uma vez, com TTA2, e TFLite | | | | | |
+| R09 | final | B0 768 com externos (R12, semente 42): teste uma vez, com TTA2, e TFLite. **Valores do teste** (03/11) | 0,765 | **0,795** | 0,769 | 0,931 | — |
 | R10 | 3 | B0 em 768 px (o grau 1 não melhorou de 448 para 640) | 0,757 | 0,790 | 0,780 | 0,927 | 0,823 |
 | R10 s17 | 4 | R10 (B0 768) com semente 17 | 0,747 | 0,785 | 0,765 | 0,926 | 0,837 |
 | R11 | 4 | V2-B0 em 768 px, semente 42 | 0,775 | 0,747 | 0,757 | 0,928 | 0,843 |
@@ -331,3 +331,41 @@ da semente 17). Modelos salvos em `modelos/`:
    CPU do Colab; o tempo no celular fica para o app).
 
 Sem treino, deve levar menos de 1 h (~5 unidades). A sessão desliga sozinha.
+
+### R09: resultado no teste (03/11/2026, commit 657ff09)
+
+R12 semente 42 com TTA2 e os limiares da validação (olho 0,1926, paciente
+0,2837), no teste de 3.514 olhos (1.757 pacientes), medido uma única vez.
+Pasta `resultados/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_657ff09_20261103_2020/`.
+Intervalos de 95% por bootstrap de pacientes (1.000 reamostragens).
+
+| Teste | ROC-AUC [IC 95%] | PR-AUC | Sensibilidade [IC 95%] | Especificidade [IC 95%] |
+|---|---|---:|---|---|
+| Por paciente | 0,934 [0,920; 0,947] | 0,912 | 0,894 [0,869; 0,919] | 0,795 [0,772; 0,817] |
+| Por olho | 0,939 [0,927; 0,950] | 0,906 | 0,909 [0,889; 0,928] | 0,783 [0,764; 0,800] |
+
+- **Validação → teste, por paciente:** ROC-AUC de 0,930 para 0,934 e
+  especificidade de 0,801 para 0,795. A escolha do modelo e do limiar na
+  validação não inflou o resultado.
+- **Por grau (olho):** grau 0 com 21,7% marcados como doentes (559 de 2.572).
+  Sensibilidade de 76,5% no grau 1 (176 de 230), 94,9% no grau 2 (520 de
+  548), 97,7% no grau 3 (86 de 88) e 97,4% no grau 4 (74 de 76). 32 dos 712
+  olhos de grau ≥ 2 não foram detectados.
+- **Retinopatia referenciável (grau ≥ 2),** com os limiares próprios da
+  validação: por paciente, ROC-AUC 0,958, sensibilidade 0,900 e
+  especificidade 0,902.
+- **Modos de TTA no teste, por paciente** (cada um com o seu limiar da
+  validação): sem TTA, ROC 0,931 / sens. 0,909 / espec. 0,765; TTA2, 0,934 /
+  0,894 / 0,795; TTA4, 0,937 / 0,907 / 0,769. Fica o TTA2, escolhido antes
+  na validação: duas passagens pela rede no celular.
+- **Contra o melhor teste anterior** (B4 448 com as imagens extras, 10/10):
+  por paciente, ROC-AUC de 0,923 para 0,934 e especificidade de 0,693 para
+  0,795; falsos positivos no grau 0 de 30,3% para 21,7%. O grau 1 não mudou
+  (0,765 nos dois).
+- **TFLite:** a exportação parou com o modelo de inferência diferente do
+  treinado (diferença máxima de 0,81 na probabilidade). Montada com
+  `weights=None`, a EfficientNet do Keras deixa de fora a camada que divide
+  a entrada pelo desvio padrão da ImageNet. Corrigido em
+  `modelo.construir_modelo_inferencia`, que agora também confere as camadas
+  das duas redes. A conversão é refeita sem abrir o teste, em
+  `notebooks/execucoes/R09_tflite_b0_768.ipynb` (`modelo_final.rodar_tflite`).
