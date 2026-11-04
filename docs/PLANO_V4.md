@@ -369,3 +369,23 @@ Intervalos de 95% por bootstrap de pacientes (1.000 reamostragens).
   `modelo.construir_modelo_inferencia`, que agora também confere as camadas
   das duas redes. A conversão é refeita sem abrir o teste, em
   `notebooks/execucoes/R09_tflite_b0_768.ipynb` (`modelo_final.rodar_tflite`).
+
+### R09: TFLite (03/11/2026, commit 66c4399)
+
+Arquivos em `modelos/tflite/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741_{fp32,fp16,int8}.tflite`.
+Paridade com o Keras em 200 imagens da validação, sem TTA:
+
+| Formato | Tamanho | Diferença média | Diferença máxima | ROC-AUC na amostra | Tempo por imagem (CPU do Colab) |
+|---|---:|---:|---:|---:|---:|
+| Keras | 80,7 MB | — | — | 0,9332 | — |
+| fp32 | 16,1 MB | 0,0005 | 0,0054 | 0,9331 | 0,077 s |
+| **fp16** | **8,1 MB** | 0,0006 | 0,0060 | 0,9331 | 0,077 s |
+| int8 dinâmico | 4,6 MB | 0,0206 | 0,2065 | 0,9282 | 0,135 s |
+
+- **fp16 é o arquivo para o app:** metade do tamanho do fp32, com a mesma
+  previsão (diferença máxima de 0,006 na probabilidade).
+- **int8 dinâmico fica de fora:** muda a probabilidade em até 0,21, o que
+  desloca o limiar escolhido na validação, perde 0,005 de ROC-AUC na amostra
+  e foi mais lento na CPU do Colab.
+- **Tempo:** com TTA2 são duas passagens, cerca de 0,15 s por foto na CPU do
+  Colab. O tempo no celular só se mede no app.
