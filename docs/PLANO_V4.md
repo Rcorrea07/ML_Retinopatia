@@ -308,6 +308,26 @@ da semente 17). Modelos salvos em `modelos/`:
 `R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras`
 (s42) e `..._extra_externos_seed17_ec4e460_20261102_1741.keras` (s17).
 
+## Validação externa (V01, Messidor-2)
+
+Preparada em 19/11/2026 (branch `refatoracao`, notebook `Validacao_Externa.ipynb`,
+experimento `V01_r12_messidor2`). O modelo final (R12 semente 42, TTA2) é medido
+uma única vez no Messidor-2: 1.748 fotos de 874 exames com os dois olhos (França,
+Topcon), graus de consenso do Google. Nada é escolhido no Messidor-2: os limiares
+são os da validação do EyePACS (0,1926 por olho e 0,2837 por paciente), refeitos
+das predições do R09 e conferidos com o resumo dele. Só as fotos graduáveis são
+medidas.
+
+**Desfecho principal (fixado antes de rodar):** por paciente, só os pacientes com
+os dois olhos graduáveis, qualquer retinopatia (graus 1 a 4), sensibilidade e
+especificidade nos limiares do EyePACS e ROC-AUC, com intervalos de 95% por
+bootstrap de pacientes. Secundários: por olho, todos os pacientes com algum olho
+graduável, retinopatia referenciável (limiar escolhido na validação do EyePACS),
+por grau e os três modos de TTA.
+
+Custo previsto: uma sessão A100 curta (extrair e processar 1.748 fotos e prever),
+menos de 1 h.
+
 ## Final
 
 1. Avaliar o modelo escolhido uma única vez no teste (`RETINOPATIA_AVALIAR_TESTE = "1"`).
