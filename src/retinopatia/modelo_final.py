@@ -93,8 +93,8 @@ def preparar_imagens_avaliacao(incluir_teste=True):
 def avaliar_modelo_final(
     df_val,
     df_teste,
-    caminho_modelo=configuracao.CAMINHO_MODELO_ESCOLHIDO,
-    modo_tta=configuracao.MODO_TTA
+    caminho_modelo=None,
+    modo_tta=None
 ):
     """
     Limiares na validação e medida única no teste do modelo salvo em
@@ -104,6 +104,12 @@ def avaliar_modelo_final(
     Retorna:
         (modelo, resultado_validacao, resultado_teste)
     """
+
+    if caminho_modelo is None:
+        caminho_modelo = configuracao.CAMINHO_MODELO_ESCOLHIDO
+
+    if modo_tta is None:
+        modo_tta = configuracao.MODO_TTA
 
     print(f"Modelo avaliado: {caminho_modelo}")
 
@@ -206,10 +212,10 @@ def _prever_tflite(conteudo, imagens):
 def exportar_tflite(
     modelo,
     df_val,
-    pasta=configuracao.PASTA_TFLITE,
-    caminho_modelo=configuracao.CAMINHO_MODELO_ESCOLHIDO,
-    amostras=configuracao.AMOSTRAS_PARIDADE_TFLITE,
-    tolerancia=configuracao.TOLERANCIA_INFERENCIA
+    pasta=None,
+    caminho_modelo=None,
+    amostras=None,
+    tolerancia=None
 ):
     """
     Converte o modelo para TFLite (float32, float16 e int8 dinâmico) e
@@ -223,6 +229,18 @@ def exportar_tflite(
 
     Retorna a tabela de paridade (também salva na pasta da execução).
     """
+
+    if pasta is None:
+        pasta = configuracao.PASTA_TFLITE
+
+    if caminho_modelo is None:
+        caminho_modelo = configuracao.CAMINHO_MODELO_ESCOLHIDO
+
+    if amostras is None:
+        amostras = configuracao.AMOSTRAS_PARIDADE_TFLITE
+
+    if tolerancia is None:
+        tolerancia = configuracao.TOLERANCIA_INFERENCIA
 
     inferencia = construir_modelo_inferencia(modelo)
 
@@ -325,7 +343,7 @@ def rodar_final(desligar_ao_terminar=True):
 
 
 def rodar_tflite(
-    caminho_modelo=configuracao.CAMINHO_MODELO_ESCOLHIDO,
+    caminho_modelo=None,
     desligar_ao_terminar=True
 ):
     """
@@ -337,6 +355,9 @@ def rodar_tflite(
     Retorna:
         a tabela de paridade
     """
+
+    if caminho_modelo is None:
+        caminho_modelo = configuracao.CAMINHO_MODELO_ESCOLHIDO
 
     try:
         df_val, _ = preparar_imagens_avaliacao(incluir_teste=False)
