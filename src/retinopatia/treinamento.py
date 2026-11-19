@@ -163,7 +163,7 @@ def criar_callbacks(
     caminho_pesos,
     caminho_historico,
     paciencia_early_stop,
-    metrica=configuracao.METRICA_MONITORADA
+    metrica=None
 ):
     """
     Cria os callbacks de monitorização do treino.
@@ -173,6 +173,9 @@ def criar_callbacks(
     gravado em CSV. A taxa de aprendizado não é ajustada por callback:
     na Fase 2 ela segue um agendamento em cosseno.
     """
+
+    if metrica is None:
+        metrica = configuracao.METRICA_MONITORADA
 
     for caminho in (caminho_pesos, caminho_historico):
         os.makedirs(
@@ -236,8 +239,8 @@ def criar_taxa_cosseno(
     treino_data,
     epocas,
     taxa_maxima,
-    epocas_aquecimento=configuracao.EPOCAS_AQUECIMENTO_FASE2,
-    fracao_final=configuracao.FRACAO_LR_FINAL
+    epocas_aquecimento=None,
+    fracao_final=None
 ):
     """
     Agendamento da taxa de aprendizado: sobe linearmente de quase zero
@@ -247,6 +250,12 @@ def criar_taxa_cosseno(
     O aquecimento evita que os primeiros gradientes da rede recém-
     descongelada destruam os pesos da ImageNet.
     """
+
+    if epocas_aquecimento is None:
+        epocas_aquecimento = configuracao.EPOCAS_AQUECIMENTO_FASE2
+
+    if fracao_final is None:
+        fracao_final = configuracao.FRACAO_LR_FINAL
 
     passos_por_epoca = int(treino_data.cardinality())
 
@@ -273,8 +282,8 @@ def treinar_fase1(
     val_data,
     pesos_dicionario,
     callbacks,
-    epocas=configuracao.EPOCAS_FASE1,
-    caminho_pesos=configuracao.CAMINHO_PESOS_FASE1
+    epocas=None,
+    caminho_pesos=None
 ):
     """
     Treina apenas as cabeças da rede e recarrega o melhor checkpoint ao
@@ -286,6 +295,12 @@ def treinar_fase1(
 
     Retorna o histórico do treino.
     """
+
+    if epocas is None:
+        epocas = configuracao.EPOCAS_FASE1
+
+    if caminho_pesos is None:
+        caminho_pesos = configuracao.CAMINHO_PESOS_FASE1
 
     if configuracao.PESOS_INICIAIS:
         iniciar_de_modelo_anterior(
@@ -324,10 +339,10 @@ def fine_tuning_fase2(
     val_data,
     pesos_dicionario,
     callbacks,
-    epocas=configuracao.EPOCAS_FASE2,
-    taxa_aprendizado=configuracao.TAXA_APRENDIZADO_FASE2,
-    caminho_pesos_fase1=configuracao.CAMINHO_PESOS_FASE1,
-    caminho_pesos_fase2=configuracao.CAMINHO_PESOS_FASE2
+    epocas=None,
+    taxa_aprendizado=None,
+    caminho_pesos_fase1=None,
+    caminho_pesos_fase2=None
 ):
     """
     Executa o fine-tuning: recupera os pesos da Fase 1, descongela a
@@ -337,6 +352,18 @@ def fine_tuning_fase2(
 
     Retorna o histórico do treino da Fase 2.
     """
+
+    if epocas is None:
+        epocas = configuracao.EPOCAS_FASE2
+
+    if taxa_aprendizado is None:
+        taxa_aprendizado = configuracao.TAXA_APRENDIZADO_FASE2
+
+    if caminho_pesos_fase1 is None:
+        caminho_pesos_fase1 = configuracao.CAMINHO_PESOS_FASE1
+
+    if caminho_pesos_fase2 is None:
+        caminho_pesos_fase2 = configuracao.CAMINHO_PESOS_FASE2
 
     print("Recuperando os melhores pesos da Fase 1...")
 
@@ -381,13 +408,16 @@ def fine_tuning_fase2(
 def iniciar_de_modelo_anterior(
     modelo,
     caminho_modelo,
-    caminho_pesos_fase1=configuracao.CAMINHO_PESOS_FASE1
+    caminho_pesos_fase1=None
 ):
     """
     Copia para `modelo` os pesos de um modelo .keras já treinado, com a
     mesma arquitetura e outro tamanho de imagem (os pesos de convolução
     não dependem do tamanho), e grava-os como o checkpoint da Fase 1.
     """
+
+    if caminho_pesos_fase1 is None:
+        caminho_pesos_fase1 = configuracao.CAMINHO_PESOS_FASE1
 
     print(f"Iniciando com os pesos de {caminho_modelo}...")
 
@@ -416,11 +446,11 @@ def iniciar_de_modelo_anterior(
 
 def gerar_alvos_professor(
     df_treino,
-    caminho_professor=configuracao.CAMINHO_PROFESSOR,
-    tamanho_imagem=configuracao.TAMANHO_IMAGEM_PROFESSOR,
-    pasta_imagens=configuracao.PASTA_IMAGENS_PROFESSOR,
-    pasta_dados_internos=configuracao.PASTA_DADOS_INTERNOS,
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    caminho_professor=None,
+    tamanho_imagem=None,
+    pasta_imagens=None,
+    pasta_dados_internos=None,
+    pasta_resultados=None
 ):
     """
     Acrescenta ao treino a coluna `prob_professor`: a probabilidade de
@@ -440,6 +470,21 @@ def gerar_alvos_professor(
     as probabilidades dele no treino são mais confiantes do que seriam
     em imagens novas.
     """
+
+    if caminho_professor is None:
+        caminho_professor = configuracao.CAMINHO_PROFESSOR
+
+    if tamanho_imagem is None:
+        tamanho_imagem = configuracao.TAMANHO_IMAGEM_PROFESSOR
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_PROFESSOR
+
+    if pasta_dados_internos is None:
+        pasta_dados_internos = configuracao.PASTA_DADOS_INTERNOS
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS
 
     import pandas as pd
 
@@ -537,7 +582,7 @@ def gerar_alvos_professor(
         # configuradas no início do notebook
         from . import utilitarios
 
-        utilitarios.configurar_sementes(configuracao.SEED)
+        utilitarios.configurar_sementes(configuracao.SEED_TREINO)
         utilitarios.configurar_precisao_mista()
 
     resultado = df_treino.merge(
