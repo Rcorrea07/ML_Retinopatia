@@ -56,14 +56,23 @@ def _executar(comando):
 
 
 def extrair_rotulos(
-    caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
-    pasta_base=configuracao.PASTA_BASE,
-    caminho_csv=configuracao.CAMINHO_CSV
+    caminho_zip_principal=None,
+    pasta_base=None,
+    caminho_csv=None
 ):
     """
     Extrai do zip principal apenas o CSV de rótulos. Basta quando as
     imagens processadas vêm do cache no Drive.
     """
+
+    if caminho_zip_principal is None:
+        caminho_zip_principal = configuracao.CAMINHO_ZIP_PRINCIPAL
+
+    if pasta_base is None:
+        pasta_base = configuracao.PASTA_BASE
+
+    if caminho_csv is None:
+        caminho_csv = configuracao.CAMINHO_CSV
 
     if os.path.isfile(caminho_csv):
         print("O CSV de rótulos já foi extraído.")
@@ -104,8 +113,8 @@ def _imagens_completas(pasta_imagens, nomes_esperados=None):
 def _extrair_imagens(
     nome,
     pasta_imagens,
-    caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
-    pasta_base=configuracao.PASTA_BASE,
+    caminho_zip_principal=None,
+    pasta_base=None,
     nomes_esperados=None
 ):
     """
@@ -116,6 +125,12 @@ def _extrair_imagens(
     juntá-los num arquivo único (o cat antigo duplicava ~35 GB no
     disco), e os pedaços são apagados depois da extração.
     """
+
+    if caminho_zip_principal is None:
+        caminho_zip_principal = configuracao.CAMINHO_ZIP_PRINCIPAL
+
+    if pasta_base is None:
+        pasta_base = configuracao.PASTA_BASE
 
     if _imagens_completas(pasta_imagens, nomes_esperados):
         print(f"As imagens de '{nome}' já foram extraídas.")
@@ -163,9 +178,9 @@ def _extrair_imagens(
 
 
 def extrair_dataset(
-    caminho_zip_principal=configuracao.CAMINHO_ZIP_PRINCIPAL,
-    pasta_base=configuracao.PASTA_BASE,
-    pasta_imagens=configuracao.PASTA_IMAGENS,
+    caminho_zip_principal=None,
+    pasta_base=None,
+    pasta_imagens=None,
     somente_rotulos=False
 ):
     """
@@ -174,6 +189,15 @@ def extrair_dataset(
     `somente_rotulos=True` (imagens processadas restauradas do cache),
     extrai só o CSV.
     """
+
+    if caminho_zip_principal is None:
+        caminho_zip_principal = configuracao.CAMINHO_ZIP_PRINCIPAL
+
+    if pasta_base is None:
+        pasta_base = configuracao.PASTA_BASE
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS
 
     extrair_rotulos(caminho_zip_principal, pasta_base)
 
@@ -190,10 +214,10 @@ def extrair_dataset(
 
 def preparar_imagens_extra(
     df_extra,
-    pasta_imagens=configuracao.PASTA_IMAGENS_EXTRA,
-    pasta_saida=configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA,
-    caminhos_zip_cache=configuracao.CAMINHOS_ZIP_CACHE_EXTRA,
-    caminho_lista_suspeitas=configuracao.CAMINHO_LISTA_SUSPEITAS_EXTRA
+    pasta_imagens=None,
+    pasta_saida=None,
+    caminhos_zip_cache=None,
+    caminho_lista_suspeitas=None
 ):
     """
     Deixa prontas as imagens extras (test de 2015) já processadas: usa o
@@ -201,6 +225,18 @@ def preparar_imagens_extra(
     com o mesmo pré-processamento do train e, no notebook Preparar_Caches,
     salva o cache no Drive.
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_EXTRA
+
+    if pasta_saida is None:
+        pasta_saida = configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA
+
+    if caminhos_zip_cache is None:
+        caminhos_zip_cache = configuracao.CAMINHOS_ZIP_CACHE_EXTRA
+
+    if caminho_lista_suspeitas is None:
+        caminho_lista_suspeitas = configuracao.CAMINHO_LISTA_SUSPEITAS_EXTRA
 
     from . import pre_processamento
 
@@ -315,8 +351,8 @@ def preparar_dados_adicionais(dados):
 
 
 def restaurar_cache_imagens(
-    pasta_imagens_otimizadas=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    caminhos_zip_cache=configuracao.CAMINHOS_ZIP_CACHE
+    pasta_imagens_otimizadas=None,
+    caminhos_zip_cache=None
 ):
     """
     Restaura do Drive as imagens já processadas desta versão do
@@ -328,6 +364,12 @@ def restaurar_cache_imagens(
     estavam no disco ou foram restauradas), e False se será preciso
     extrair o dataset bruto e processá-lo.
     """
+
+    if pasta_imagens_otimizadas is None:
+        pasta_imagens_otimizadas = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if caminhos_zip_cache is None:
+        caminhos_zip_cache = configuracao.CAMINHOS_ZIP_CACHE
 
     if (
         os.path.isdir(pasta_imagens_otimizadas)
@@ -372,9 +414,9 @@ def restaurar_cache_imagens(
 
 
 def salvar_cache_imagens(
-    pasta_imagens_otimizadas=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    caminho_zip_cache=configuracao.CAMINHO_ZIP_CACHE,
-    gravar=configuracao.GRAVAR_CACHE
+    pasta_imagens_otimizadas=None,
+    caminho_zip_cache=None,
+    gravar=None
 ):
     """
     Guarda no Drive um zip das imagens processadas, se ainda não
@@ -387,6 +429,15 @@ def salvar_cache_imagens(
     conta do projeto não tem espaço para caches novos, e gravar na pasta
     compartilhada gastaria a cota dela.
     """
+
+    if pasta_imagens_otimizadas is None:
+        pasta_imagens_otimizadas = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if caminho_zip_cache is None:
+        caminho_zip_cache = configuracao.CAMINHO_ZIP_CACHE
+
+    if gravar is None:
+        gravar = configuracao.GRAVAR_CACHE
 
     if not gravar:
         print(
@@ -565,12 +616,15 @@ def baixar_url_para_drive(url, caminho_destino):
     _executar(f'curl -L --fail -sS -o "{caminho_destino}" "{url}"')
 
 
-def baixar_datasets_externos(pasta=configuracao.PASTA_DATASETS):
+def baixar_datasets_externos(pasta=None):
     """
     Baixa os datasets de `configuracao.DATASETS_KAGGLE` e
     `configuracao.DATASETS_URL`, cada um na sua subpasta de `pasta`.
     Pula os que já estão lá, então pode rodar de novo se cair no meio.
     """
+
+    if pasta is None:
+        pasta = configuracao.PASTA_DATASETS
 
     for nome, identificador in configuracao.DATASETS_KAGGLE.items():
         destino = os.path.join(pasta, nome)
