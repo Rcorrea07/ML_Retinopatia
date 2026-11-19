@@ -560,7 +560,7 @@ def retrato_metricas(
                 }
 
                 linhas += _linhas_tabela(
-                    avaliacao.comparar_modos_tta(base, variantes),
+                    avaliacao.comparar_modos(base, variantes),
                     nome,
                     "todos",
                     "modos_tta"
