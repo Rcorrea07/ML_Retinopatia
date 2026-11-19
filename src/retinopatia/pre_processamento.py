@@ -11,8 +11,8 @@ retinopatia (Ben Graham em 2015 e os notebooks de topo da APTOS 2019):
 3. A normalização de cor de Ben Graham remove diferenças de iluminação.
 4. Uma máscara circular descarta a borda do círculo.
 
-O que mudou da v2 para a v3 (as duas continuam disponíveis pelos
-parâmetros `metodo_mascara` e `ben_respeita_mascara`):
+O que mudou da v2 para a v3 (a v2 só existe no código da tag
+`treino-v2`):
 
 - A máscara usa um limiar fixo baixo em vez de Otsu, que falhava em
   fotos escuras e pegava só parte da retina.
@@ -48,32 +48,19 @@ from . import configuracao
 _PADRAO = object()
 
 
-def criar_mascara_retina(
-    img,
-    metodo_mascara=None,
-    limiar=None
-):
+def criar_mascara_retina(img, limiar=None):
     """
     Cria a máscara binária (0 ou 255) da retina.
 
-    Com "limiar_fixo", mantém os pixels acima de `limiar`, fica só com a
-    maior região conexa e preenche a sua envoltória convexa, o que fecha
-    buracos (como a fóvea escura) e reentrâncias. Em fotos quase
-    totalmente pretas o limiar fixo não acha uma retina de tamanho
-    plausível; nesses casos a máscara volta a ser a de Otsu. Com "otsu",
-    reproduz a máscara da v2.
+    Mantém os pixels acima de `limiar`, fica só com a maior região
+    conexa e preenche a sua envoltória convexa, o que fecha buracos
+    (como a fóvea escura) e reentrâncias. Em fotos quase totalmente
+    pretas o limiar fixo não acha uma retina de tamanho plausível;
+    nesses casos a máscara volta a ser a de Otsu.
     """
-
-    if metodo_mascara is None:
-        metodo_mascara = configuracao.METODO_MASCARA
 
     if limiar is None:
         limiar = configuracao.LIMIAR_MASCARA
-
-    if metodo_mascara not in ("limiar_fixo", "otsu"):
-        raise ValueError(
-            f"Método de máscara desconhecido: {metodo_mascara}"
-        )
 
     # Converte para escala de cinza somente para criar a máscara
     gray = cv2.cvtColor(
@@ -95,9 +82,6 @@ def criar_mascara_retina(
         255,
         cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
-
-    if metodo_mascara == "otsu":
-        return mascara_otsu
 
     _, mascara = cv2.threshold(
         gray_blur,
@@ -266,31 +250,6 @@ def fracao_mascara(mascara_quadrada, area_foto_quadrada):
     return coberta.sum() / max(esperada.sum(), 1)
 
 
-def normalizar_cor_ben(img, sigma=None):
-    """
-    Normalização de cor de Ben Graham: subtrai a cor média local
-    (desfoque gaussiano) e centraliza em 128.
-
-    Remove variações de iluminação e de câmera e realça estruturas
-    pequenas como microaneurismas e exsudatos.
-    """
-
-    if sigma is None:
-        sigma = configuracao.SIGMA_BEN
-
-    desfocada = cv2.GaussianBlur(
-        img,
-        (0, 0),
-        sigma
-    )
-
-    return cv2.addWeighted(
-        img, 4,
-        desfocada, -4,
-        128
-    )
-
-
 def normalizar_cor_ben_na_retina(
     img,
     mascara,
@@ -398,9 +357,7 @@ def aplicar_mascara_circular(
 def processar_retina(
     img,
     tamanho_imagem=None,
-    aplicar_ben=None,
-    metodo_mascara=None,
-    ben_respeita_mascara=None
+    aplicar_ben=None
 ):
     """
     Pré-processamento completo de uma foto de fundo de olho:
@@ -426,13 +383,7 @@ def processar_retina(
     if aplicar_ben is None:
         aplicar_ben = configuracao.APLICAR_BEN
 
-    if metodo_mascara is None:
-        metodo_mascara = configuracao.METODO_MASCARA
-
-    if ben_respeita_mascara is None:
-        ben_respeita_mascara = configuracao.BEN_RESPEITA_MASCARA
-
-    mascara = criar_mascara_retina(img, metodo_mascara)
+    mascara = criar_mascara_retina(img)
 
     quadrada, mascara_quadrada, area_foto, status = centralizar_retina(
         img,
@@ -443,11 +394,8 @@ def processar_retina(
     if status != "ok":
         return None, mascara, status
 
-    if aplicar_ben and ben_respeita_mascara:
+    if aplicar_ben:
         quadrada = normalizar_cor_ben_na_retina(quadrada, mascara_quadrada)
-
-    elif aplicar_ben:
-        quadrada = normalizar_cor_ben(quadrada)
 
     processada = aplicar_mascara_circular(quadrada)
 

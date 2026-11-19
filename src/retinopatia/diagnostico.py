@@ -18,9 +18,7 @@ Tudo parte das tabelas de predições por imagem devolvidas por
 "tabela"). As comparações de alternativas (cabeça de grau, agregação)
 usam só a validação: o teste continua sendo só medido.
 
-O módulo também permite diagnosticar o modelo do treino v2 sem
-retreinar: `preparar_dados_v2` recria, só para validação e teste, as
-imagens com o pré-processamento v2 com que ele foi treinado.
+Não usa TensorFlow: trabalha só com as tabelas de predições.
 """
 
 import os
@@ -29,87 +27,9 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from sklearn.metrics import roc_auc_score
 
-from . import avaliacao, configuracao, metricas, pipeline_dados, pre_processamento
-from .modelo import GeM
-
-
-def carregar_modelo(caminho=None):
-    """
-    Carrega um modelo salvo em `.keras` (só para predição, sem
-    recompilar).
-    """
-
-    if caminho is None:
-        caminho = configuracao.CAMINHO_MODELO_V2
-
-    if not os.path.isfile(caminho):
-        raise FileNotFoundError(
-            f"Modelo não encontrado em {caminho}. "
-            "Suba o arquivo .keras para essa pasta do Drive."
-        )
-
-    print(f"Carregando o modelo de {caminho}...")
-
-    return tf.keras.models.load_model(
-        caminho,
-        custom_objects={"GeM": GeM},
-        compile=False
-    )
-
-
-def preparar_dados_v2(
-    df_val,
-    df_teste,
-    pasta_imagens_v2=None,
-    opcoes_v2=None,
-    pasta_diagnostico=None
-):
-    """
-    Processa só as imagens de validação e teste com o pré-processamento
-    v2 (Otsu, Ben sem máscara) e monta os pipelines delas.
-
-    Precisa das fotos originais extraídas. A contagem de máscaras
-    suspeitas mostra quantas imagens o Otsu da v2 recortou mal.
-
-    Retorna:
-        (val_data_v2, teste_data_v2)
-    """
-
-    if pasta_imagens_v2 is None:
-        pasta_imagens_v2 = configuracao.PASTA_IMAGENS_V2
-
-    if opcoes_v2 is None:
-        opcoes_v2 = configuracao.OPCOES_PRE_PROCESSAMENTO_V2
-
-    if pasta_diagnostico is None:
-        pasta_diagnostico = configuracao.PASTA_DIAGNOSTICO_V2
-
-    pre_processamento.pre_processar_dataset(
-        pd.concat([df_val, df_teste]),
-        pasta_saida=pasta_imagens_v2,
-        caminho_lista_suspeitas=os.path.join(
-            pasta_diagnostico,
-            "mascaras_suspeitas_v2_val_teste.csv"
-        ),
-        **opcoes_v2
-    )
-
-    val_data = pipeline_dados.criar_dataset(
-        df_val,
-        treino=False,
-        pasta_imagens=pasta_imagens_v2
-    )
-
-    teste_data = pipeline_dados.criar_dataset(
-        df_teste,
-        treino=False,
-        pasta_imagens=pasta_imagens_v2
-    )
-
-    return val_data, teste_data
+from . import avaliacao, configuracao, metricas
 
 
 def _titulo(texto):

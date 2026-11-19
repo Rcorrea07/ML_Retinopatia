@@ -235,13 +235,6 @@ APLICAR_BEN = True
 
 SIGMA_BEN = _valor("SIGMA_BEN", 10 * _ESCALA_IMAGEM)
 
-# Como a máscara da retina é criada:
-# - "limiar_fixo" (v3): pixels acima de LIMIAR_MASCARA, maior região
-#   conexa e envoltória convexa. Funciona também em fotos escuras.
-# - "otsu" (v2): limiar de Otsu. Em fotos escuras separa "retina escura"
-#   de "retina menos escura" e pega só parte do círculo.
-METODO_MASCARA = "limiar_fixo"
-
 # Limiar, em tons de cinza de 0 a 255, que separa a retina do fundo preto
 LIMIAR_MASCARA = 10
 
@@ -250,12 +243,6 @@ LIMIAR_MASCARA = 10
 # fixo e a máscara volta a ser a de Otsu (que processou essas fotos na
 # v2). Na primeira execução da v3, 4 das 35.126 fotos caíram nesse caso.
 FRACAO_MINIMA_DIAMETRO_RETINA = 0.25
-
-# Com True (v3), a média local da normalização de Ben é calculada só
-# dentro da retina e o resto vira COR_FUNDO. Com False (v2), o
-# desfoque mistura a retina com o preto do preenchimento e cria faixas
-# claras e escuras onde a câmera cortou o círculo (topo e base).
-BEN_RESPEITA_MASCARA = True
 
 # Erosão da máscara antes da normalização de Ben, em pixels da imagem
 # final: descarta a borda da retina, onde a iluminação é irregular
@@ -755,29 +742,6 @@ AGREGACOES_PACIENTE = ["max", "media", "max_media"]
 
 # Imagens mostradas na lista de falsos negativos
 NUMERO_IMAGENS_ERRO = 12
-
-# Modelo do treino v2 (EfficientNetB4 448, pré-processamento v2), para
-# o diagnóstico sem retreinar (treino de ~10 h, código da tag treino-v2).
-CAMINHO_MODELO_V2 = os.path.join(
-    PASTA_MODELOS,
-    "B4_448_v2_de5cc37.keras"
-)
-
-# Cache das imagens com o pré-processamento v2, recriado só para
-# validação e teste, para avaliar o modelo v2 nas imagens com que ele
-# foi treinado
-PASTA_IMAGENS_V2 = f"/content/dataset_retina_v2_{TAMANHO_IMAGEM[0]}"
-
-OPCOES_PRE_PROCESSAMENTO_V2 = {
-    "metodo_mascara": "otsu",
-    "ben_respeita_mascara": False
-}
-
-PASTA_DIAGNOSTICO_V2 = os.path.join(
-    PASTA_PROJETO_DRIVE,
-    "resultados",
-    "diagnostico_modelo_v2"
-)
 
 # ============================================================
 # PROFESSOR DA DESTILAÇÃO
