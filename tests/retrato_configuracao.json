@@ -1,0 +1,321 @@
+{
+    "padrao": {
+        "ambiente": {},
+        "valores": {
+            "NOME_EXPERIMENTO": "padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "NOME_MODELO": "padrao_B4_448_v3_extra_<commit>_20261022_1200",
+            "PASTA_RESULTADOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "PASTA_CHECKPOINTS": "/content/checkpoints/padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "CAMINHO_MODELO_FINAL": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/padrao_B4_448_v3_extra_<commit>_20261022_1200.keras",
+            "CAMINHO_PESOS_FASE1": "/content/checkpoints/padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase1.weights.h5",
+            "CAMINHO_PESOS_FASE2": "/content/checkpoints/padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase2.weights.h5",
+            "CAMINHO_HISTORICO_FASE2": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/padrao_EfficientNetB4_448_prev3_seed42_extra_<commit>_20261022_1200/historico_fase2.csv",
+            "PASTA_IMAGENS_OTIMIZADAS": "/content/dataset_retina_v3_448",
+            "CAMINHOS_ZIP_CACHE": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3.csv",
+            "PASTA_IMAGENS_OTIMIZADAS_EXTRA": "/content/dataset_retina_v3_448_extra",
+            "CAMINHOS_ZIP_CACHE_EXTRA": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_extra.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_extra.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS_EXTRA": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_extra.csv",
+            "PASTAS_IMAGENS_EXTERNAS": {
+                "DDR": "/content/dataset_retina_v3_448_ddr",
+                "APTOS": "/content/dataset_retina_v3_448_aptos",
+                "DeepDRiD": "/content/dataset_retina_v3_448_deepdrid",
+                "IDRiD": "/content/dataset_retina_v3_448_idrid"
+            },
+            "CAMINHOS_ZIP_CACHE_EXTERNOS": {
+                "DDR": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_ddr.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_ddr.zip"
+                ],
+                "APTOS": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_aptos.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_aptos.zip"
+                ],
+                "DeepDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_deepdrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_deepdrid.zip"
+                ],
+                "IDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_idrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_idrid.zip"
+                ]
+            },
+            "CAMINHOS_LISTA_SUSPEITAS_EXTERNOS": {
+                "DDR": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_ddr.csv",
+                "APTOS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_aptos.csv",
+                "DeepDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_deepdrid.csv",
+                "IDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_idrid.csv"
+            },
+            "PASTA_SPLITS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits",
+            "VERSAO_SPLIT": "v2",
+            "SEED_SPLIT": 42,
+            "CAMINHO_MODELO_ESCOLHIDO": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras",
+            "PASTA_TFLITE": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/tflite",
+            "CAMINHO_PROFESSOR": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/B4_448_v3_extra_22f95c4.keras",
+            "PASTA_IMAGENS_PROFESSOR": "/content/dataset_retina_v3_448",
+            "CAMINHO_REGISTRO_EXPERIMENTOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/registro_experimentos.csv"
+        }
+    },
+    "R03_b0_448_destilacao": {
+        "ambiente": {},
+        "valores": {
+            "NOME_EXPERIMENTO": "R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "NOME_MODELO": "R03_b0_448_destilacao_B0_448_v3_extra_<commit>_20261022_1200",
+            "PASTA_RESULTADOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "PASTA_CHECKPOINTS": "/content/checkpoints/R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200",
+            "CAMINHO_MODELO_FINAL": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R03_b0_448_destilacao_B0_448_v3_extra_<commit>_20261022_1200.keras",
+            "CAMINHO_PESOS_FASE1": "/content/checkpoints/R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase1.weights.h5",
+            "CAMINHO_PESOS_FASE2": "/content/checkpoints/R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase2.weights.h5",
+            "CAMINHO_HISTORICO_FASE2": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R03_b0_448_destilacao_EfficientNetB0_448_prev3_seed42_extra_<commit>_20261022_1200/historico_fase2.csv",
+            "PASTA_IMAGENS_OTIMIZADAS": "/content/dataset_retina_v3_448",
+            "CAMINHOS_ZIP_CACHE": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3.csv",
+            "PASTA_IMAGENS_OTIMIZADAS_EXTRA": "/content/dataset_retina_v3_448_extra",
+            "CAMINHOS_ZIP_CACHE_EXTRA": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_extra.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_extra.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS_EXTRA": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_extra.csv",
+            "PASTAS_IMAGENS_EXTERNAS": {
+                "DDR": "/content/dataset_retina_v3_448_ddr",
+                "APTOS": "/content/dataset_retina_v3_448_aptos",
+                "DeepDRiD": "/content/dataset_retina_v3_448_deepdrid",
+                "IDRiD": "/content/dataset_retina_v3_448_idrid"
+            },
+            "CAMINHOS_ZIP_CACHE_EXTERNOS": {
+                "DDR": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_ddr.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_ddr.zip"
+                ],
+                "APTOS": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_aptos.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_aptos.zip"
+                ],
+                "DeepDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_deepdrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_deepdrid.zip"
+                ],
+                "IDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_448_idrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_448_idrid.zip"
+                ]
+            },
+            "CAMINHOS_LISTA_SUSPEITAS_EXTERNOS": {
+                "DDR": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_ddr.csv",
+                "APTOS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_aptos.csv",
+                "DeepDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_deepdrid.csv",
+                "IDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_idrid.csv"
+            },
+            "PASTA_SPLITS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits",
+            "VERSAO_SPLIT": "v2",
+            "SEED_SPLIT": 42,
+            "CAMINHO_MODELO_ESCOLHIDO": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras",
+            "PASTA_TFLITE": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/tflite",
+            "CAMINHO_PROFESSOR": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/B4_448_v3_extra_22f95c4.keras",
+            "PASTA_IMAGENS_PROFESSOR": "/content/dataset_retina_v3_448",
+            "CAMINHO_REGISTRO_EXPERIMENTOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/registro_experimentos.csv"
+        }
+    },
+    "R10_b0_768": {
+        "ambiente": {},
+        "valores": {
+            "NOME_EXPERIMENTO": "R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "NOME_MODELO": "R10_b0_768_B0_768_v3_extra_<commit>_20261022_1200",
+            "PASTA_RESULTADOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "PASTA_CHECKPOINTS": "/content/checkpoints/R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "CAMINHO_MODELO_FINAL": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R10_b0_768_B0_768_v3_extra_<commit>_20261022_1200.keras",
+            "CAMINHO_PESOS_FASE1": "/content/checkpoints/R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase1.weights.h5",
+            "CAMINHO_PESOS_FASE2": "/content/checkpoints/R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase2.weights.h5",
+            "CAMINHO_HISTORICO_FASE2": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R10_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/historico_fase2.csv",
+            "PASTA_IMAGENS_OTIMIZADAS": "/content/dataset_retina_v3_768",
+            "CAMINHOS_ZIP_CACHE": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768.csv",
+            "PASTA_IMAGENS_OTIMIZADAS_EXTRA": "/content/dataset_retina_v3_768_extra",
+            "CAMINHOS_ZIP_CACHE_EXTRA": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_extra.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_extra.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS_EXTRA": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_extra.csv",
+            "PASTAS_IMAGENS_EXTERNAS": {
+                "DDR": "/content/dataset_retina_v3_768_ddr",
+                "APTOS": "/content/dataset_retina_v3_768_aptos",
+                "DeepDRiD": "/content/dataset_retina_v3_768_deepdrid",
+                "IDRiD": "/content/dataset_retina_v3_768_idrid"
+            },
+            "CAMINHOS_ZIP_CACHE_EXTERNOS": {
+                "DDR": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_ddr.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_ddr.zip"
+                ],
+                "APTOS": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_aptos.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_aptos.zip"
+                ],
+                "DeepDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_deepdrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_deepdrid.zip"
+                ],
+                "IDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_idrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_idrid.zip"
+                ]
+            },
+            "CAMINHOS_LISTA_SUSPEITAS_EXTERNOS": {
+                "DDR": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_ddr.csv",
+                "APTOS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_aptos.csv",
+                "DeepDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_deepdrid.csv",
+                "IDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_idrid.csv"
+            },
+            "PASTA_SPLITS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits",
+            "VERSAO_SPLIT": "v2",
+            "SEED_SPLIT": 42,
+            "CAMINHO_MODELO_ESCOLHIDO": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras",
+            "PASTA_TFLITE": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/tflite",
+            "CAMINHO_PROFESSOR": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/B4_448_v3_extra_22f95c4.keras",
+            "PASTA_IMAGENS_PROFESSOR": "/content/dataset_retina_v3_448",
+            "CAMINHO_REGISTRO_EXPERIMENTOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/registro_experimentos.csv"
+        }
+    },
+    "R12_b0_768_externos semente 17": {
+        "ambiente": {
+            "RETINOPATIA_SEED_TREINO": "17"
+        },
+        "valores": {
+            "NOME_EXPERIMENTO": "R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200",
+            "NOME_MODELO": "R12_b0_768_externos_B0_768_v3_extra_externos_seed17_<commit>_20261022_1200",
+            "PASTA_RESULTADOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200",
+            "PASTA_CHECKPOINTS": "/content/checkpoints/R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200",
+            "CAMINHO_MODELO_FINAL": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_seed17_<commit>_20261022_1200.keras",
+            "CAMINHO_PESOS_FASE1": "/content/checkpoints/R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200/melhor_modelo_fase1.weights.h5",
+            "CAMINHO_PESOS_FASE2": "/content/checkpoints/R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200/melhor_modelo_fase2.weights.h5",
+            "CAMINHO_HISTORICO_FASE2": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R12_b0_768_externos_EfficientNetB0_768_prev3_seed17_extra_externos_<commit>_20261022_1200/historico_fase2.csv",
+            "PASTA_IMAGENS_OTIMIZADAS": "/content/dataset_retina_v3_768",
+            "CAMINHOS_ZIP_CACHE": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768.csv",
+            "PASTA_IMAGENS_OTIMIZADAS_EXTRA": "/content/dataset_retina_v3_768_extra",
+            "CAMINHOS_ZIP_CACHE_EXTRA": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_extra.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_extra.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS_EXTRA": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_extra.csv",
+            "PASTAS_IMAGENS_EXTERNAS": {
+                "DDR": "/content/dataset_retina_v3_768_ddr",
+                "APTOS": "/content/dataset_retina_v3_768_aptos",
+                "DeepDRiD": "/content/dataset_retina_v3_768_deepdrid",
+                "IDRiD": "/content/dataset_retina_v3_768_idrid"
+            },
+            "CAMINHOS_ZIP_CACHE_EXTERNOS": {
+                "DDR": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_ddr.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_ddr.zip"
+                ],
+                "APTOS": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_aptos.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_aptos.zip"
+                ],
+                "DeepDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_deepdrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_deepdrid.zip"
+                ],
+                "IDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_idrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_idrid.zip"
+                ]
+            },
+            "CAMINHOS_LISTA_SUSPEITAS_EXTERNOS": {
+                "DDR": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_ddr.csv",
+                "APTOS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_aptos.csv",
+                "DeepDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_deepdrid.csv",
+                "IDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_idrid.csv"
+            },
+            "PASTA_SPLITS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits",
+            "VERSAO_SPLIT": "v2",
+            "SEED_SPLIT": 42,
+            "CAMINHO_MODELO_ESCOLHIDO": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras",
+            "PASTA_TFLITE": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/tflite",
+            "CAMINHO_PROFESSOR": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/B4_448_v3_extra_22f95c4.keras",
+            "PASTA_IMAGENS_PROFESSOR": "/content/dataset_retina_v3_448",
+            "CAMINHO_REGISTRO_EXPERIMENTOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/registro_experimentos.csv"
+        }
+    },
+    "R09_final_b0_768": {
+        "ambiente": {
+            "RETINOPATIA_AVALIAR_TESTE": "1"
+        },
+        "valores": {
+            "NOME_EXPERIMENTO": "R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "NOME_MODELO": "R09_final_b0_768_B0_768_v3_extra_<commit>_20261022_1200",
+            "PASTA_RESULTADOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "PASTA_CHECKPOINTS": "/content/checkpoints/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200",
+            "CAMINHO_MODELO_FINAL": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R09_final_b0_768_B0_768_v3_extra_<commit>_20261022_1200.keras",
+            "CAMINHO_PESOS_FASE1": "/content/checkpoints/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase1.weights.h5",
+            "CAMINHO_PESOS_FASE2": "/content/checkpoints/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/melhor_modelo_fase2.weights.h5",
+            "CAMINHO_HISTORICO_FASE2": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_<commit>_20261022_1200/historico_fase2.csv",
+            "PASTA_IMAGENS_OTIMIZADAS": "/content/dataset_retina_v3_768",
+            "CAMINHOS_ZIP_CACHE": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768.csv",
+            "PASTA_IMAGENS_OTIMIZADAS_EXTRA": "/content/dataset_retina_v3_768_extra",
+            "CAMINHOS_ZIP_CACHE_EXTRA": [
+                "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_extra.zip",
+                "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_extra.zip"
+            ],
+            "CAMINHO_LISTA_SUSPEITAS_EXTRA": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_extra.csv",
+            "PASTAS_IMAGENS_EXTERNAS": {
+                "DDR": "/content/dataset_retina_v3_768_ddr",
+                "APTOS": "/content/dataset_retina_v3_768_aptos",
+                "DeepDRiD": "/content/dataset_retina_v3_768_deepdrid",
+                "IDRiD": "/content/dataset_retina_v3_768_idrid"
+            },
+            "CAMINHOS_ZIP_CACHE_EXTERNOS": {
+                "DDR": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_ddr.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_ddr.zip"
+                ],
+                "APTOS": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_aptos.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_aptos.zip"
+                ],
+                "DeepDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_deepdrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_deepdrid.zip"
+                ],
+                "IDRiD": [
+                    "/content/drive/MyDrive/ProjetoRetinopatia_caches/dataset_retina_v3_768_idrid.zip",
+                    "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/dataset_retina_v3_768_idrid.zip"
+                ]
+            },
+            "CAMINHOS_LISTA_SUSPEITAS_EXTERNOS": {
+                "DDR": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_ddr.csv",
+                "APTOS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_aptos.csv",
+                "DeepDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_deepdrid.csv",
+                "IDRiD": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/cache/mascaras_suspeitas_v3_768_idrid.csv"
+            },
+            "PASTA_SPLITS": "/content/drive/MyDrive/ProjetoRetinopatia/dados_internos/splits",
+            "VERSAO_SPLIT": "v2",
+            "SEED_SPLIT": 42,
+            "CAMINHO_MODELO_ESCOLHIDO": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras",
+            "PASTA_TFLITE": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/tflite",
+            "CAMINHO_PROFESSOR": "/content/drive/MyDrive/ProjetoRetinopatia/modelos/B4_448_v3_extra_22f95c4.keras",
+            "PASTA_IMAGENS_PROFESSOR": "/content/dataset_retina_v3_448",
+            "CAMINHO_REGISTRO_EXPERIMENTOS": "/content/drive/MyDrive/ProjetoRetinopatia/resultados/registro_experimentos.csv"
+        }
+    }
+}
