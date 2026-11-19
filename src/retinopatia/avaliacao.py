@@ -18,12 +18,21 @@ na regra clínica de encaminhar o paciente se qualquer olho tiver
 retinopatia. As melhores soluções da competição de 2015 ganharam
 desempenho combinando os dois olhos.
 
-Uma única função, `avaliar_modelo`, serve às duas fases de treino: o
-parâmetro `nome_fase` apenas diferencia os títulos e as mensagens.
+O módulo tem três camadas:
 
-As predições de cada imagem (probabilidade e grau previsto) são
-salvas em CSV na pasta de resultados, para que o diagnóstico possa ser
-refeito sem rodar o modelo de novo.
+- predição (`prever_variantes`): a única que usa TensorFlow, importado
+  só dentro das funções;
+- medida (`tabela_predicoes`, `comparar_modos`, `medir_predicoes`):
+  números a partir das predições, sem `print` nem gráficos. Serve a
+  qualquer conjunto (validação, teste, validação externa) e a modelos
+  de fora do Keras, desde que entreguem as predições no mesmo formato;
+- exibição (`mostrar_avaliacao`, `plotar_*`).
+
+`avaliar_predicoes` junta as três depois da predição; `avaliar_modelo`
+(validação, nas duas fases de treino) e `avaliar_no_teste` (modelo
+final) são ela mais a predição. As predições de cada imagem são salvas
+em CSV na pasta de resultados, para que o diagnóstico possa ser refeito
+sem rodar o modelo de novo.
 """
 
 import os
@@ -32,7 +41,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import tensorflow as tf
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
@@ -42,6 +50,21 @@ from sklearn.metrics import (
 
 from . import configuracao, metricas
 from .metricas import kappa_grau  # noqa: F401 (parte da interface da avaliação)
+
+# Modos da test-time augmentation e quantas variantes cada um usa: "tta2"
+# é a média das duas primeiras (original e espelho horizontal) e "tta4" a
+# média das quatro. No celular, cada variante é uma passagem a mais pela
+# rede.
+MODOS_TTA = {
+    "sem_tta": 1,
+    "tta2": 2,
+    "tta4": 4
+}
+
+
+# ============================================================
+# HISTÓRICO DO TREINO
+# ============================================================
 
 
 def _serie_historico(historico, nomes):
@@ -112,22 +135,25 @@ def plotar_historico(historico, nome_fase):
     plt.show()
 
 
-# Variantes da test-time augmentation, na ordem em que são previstas.
-# "tta2" é a média das duas primeiras (original e espelho horizontal) e
-# "tta4" a média das quatro. No celular, cada variante é uma passagem a
-# mais pela rede.
-_VARIANTES_TTA = [
-    lambda x: x,
-    tf.image.flip_left_right,
-    tf.image.flip_up_down,
-    lambda x: tf.image.flip_up_down(tf.image.flip_left_right(x))
-]
+# ============================================================
+# PREDIÇÃO (TensorFlow)
+# ============================================================
 
-MODOS_TTA = {
-    "sem_tta": 1,
-    "tta2": 2,
-    "tta4": 4
-}
+
+def _variantes_tta():
+    """
+    Transformações da test-time augmentation, na ordem em que são
+    previstas: original, espelho horizontal, espelho vertical e os dois.
+    """
+
+    import tensorflow as tf
+
+    return [
+        lambda x: x,
+        tf.image.flip_left_right,
+        tf.image.flip_up_down,
+        lambda x: tf.image.flip_up_down(tf.image.flip_left_right(x))
+    ]
 
 
 def _prever_variante(modelo, dados, transformar):
@@ -136,6 +162,8 @@ def _prever_variante(modelo, dados, transformar):
     não embaralha). No modelo de pares a entrada é um dicionário com os
     dois olhos, e a transformação vale para os dois.
     """
+
+    import tensorflow as tf
 
     # O pipeline devolve (imagens, rótulos); só as imagens interessam
     imagens = dados.map(
@@ -167,7 +195,7 @@ def prever_variantes(modelo, dados):
 
     variantes = [
         _prever_variante(modelo, dados, transformar)
-        for transformar in _VARIANTES_TTA
+        for transformar in _variantes_tta()
     ]
 
     return {
@@ -177,6 +205,11 @@ def prever_variantes(modelo, dados):
         )
         for modo, quantidade in MODOS_TTA.items()
     }
+
+
+# ============================================================
+# MEDIDA (sem TensorFlow, sem print)
+# ============================================================
 
 
 def agregar_por_paciente(df, probabilidades, funcao="max"):
@@ -200,58 +233,15 @@ def agregar_por_paciente(df, probabilidades, funcao="max"):
     return pacientes["target"].values, pacientes["valor"].values
 
 
-def salvar_predicoes(
-    df,
-    probabilidades,
-    graus_previstos,
-    nome,
-    pasta_resultados=configuracao.PASTA_RESULTADOS,
-    colunas_extras=None
-):
-    """
-    Salva a tabela de predições por imagem em
-    `pasta_resultados/predicoes_<nome>.csv` e a devolve.
-
-    Colunas: image, patient_id, level_original, target,
-    prob_doente, grau_previsto e as de `colunas_extras` (por exemplo, as
-    predições de cada modo de TTA).
-    """
-
-    tabela = df[
-        ["image", "patient_id", "level_original", "target"]
-    ].copy()
-
-    tabela["prob_doente"] = probabilidades
-    tabela["grau_previsto"] = graus_previstos
-
-    for coluna, valores in (colunas_extras or {}).items():
-        tabela[coluna] = valores
-
-    os.makedirs(
-        pasta_resultados,
-        exist_ok=True
-    )
-
-    caminho = os.path.join(
-        pasta_resultados,
-        f"predicoes_{nome}.csv"
-    )
-
-    tabela.to_csv(caminho, index=False)
-
-    print(f"\nPredições salvas em: {caminho}")
-
-    return tabela
-
-
 def escolher_limiar(
     classes_verdadeiras,
     predicoes,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+    sensibilidade_desejada=None
 ):
     """
     Escolhe, na curva ROC, o limiar que atinge pelo menos a
-    sensibilidade desejada com a menor taxa de falsos positivos.
+    sensibilidade desejada (padrão: `SENSIBILIDADE_DESEJADA`) com a
+    menor taxa de falsos positivos.
 
     Retorna:
         (limiar, sensibilidade_obtida, especificidade_obtida)
@@ -259,6 +249,9 @@ def escolher_limiar(
     Se nenhum limiar atingir a sensibilidade desejada, devolve o limiar
     padrão de 0.5 e None nas outras duas posições.
     """
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
 
     limiar, sensibilidade, especificidade = metricas.ponto_na_sensibilidade(
         classes_verdadeiras,
@@ -272,21 +265,240 @@ def escolher_limiar(
     return limiar, sensibilidade, especificidade
 
 
-def plotar_matriz_confusao(
-    classes_verdadeiras,
-    classes_preditas,
-    limiar,
-    titulo
+def tabela_predicoes(df, variantes, modo_tta):
+    """
+    Tabela de predições por imagem: image, patient_id, level_original,
+    target, `prob_doente` e `grau_previsto` do modo principal e as
+    colunas `prob_doente_<modo>` e `grau_previsto_<modo>` de cada modo de
+    `variantes`.
+    """
+
+    tabela = df[
+        ["image", "patient_id", "level_original", "target"]
+    ].copy()
+
+    tabela["prob_doente"], tabela["grau_previsto"] = variantes[modo_tta]
+
+    for modo, (probabilidades, graus) in variantes.items():
+        tabela[f"prob_doente_{modo}"] = probabilidades
+        tabela[f"grau_previsto_{modo}"] = graus
+
+    return tabela
+
+
+def _medir_nivel(classes, probabilidades, limiar, titulo):
+    """
+    ROC-AUC, PR-AUC, sensibilidade e especificidade no limiar e a matriz
+    de confusão de um nível (olho ou paciente).
+    """
+
+    if len(np.unique(classes)) != 2:
+        raise ValueError(
+            f"{titulo}: o conjunto precisa possuir as classes 0 e 1."
+        )
+
+    matriz = confusion_matrix(
+        classes,
+        (probabilidades >= limiar).astype(int),
+        labels=[0, 1]
+    )
+
+    vn, fp, fn, vp = matriz.ravel()
+
+    return {
+        "roc_auc": roc_auc_score(classes, probabilidades),
+        "pr_auc": average_precision_score(classes, probabilidades),
+        "sensibilidade": vp / (vp + fn),
+        "especificidade": vn / (vn + fp),
+        "limiar": limiar,
+        "matriz_confusao": matriz
+    }
+
+
+def comparar_modos(df, variantes, limiares=None, sensibilidade_desejada=None):
+    """
+    Compara, por paciente, as predições sem TTA, com TTA de 2 e de 4
+    variantes: ROC-AUC, AP, sensibilidade e especificidade.
+
+    Sem `limiares`, cada modo tem o seu limiar escolhido na própria
+    tabela (validação; coluna `limiar`): um limiar escolhido com TTA não
+    vale para a inferência sem TTA, e vice-versa. Com `limiares`
+    ({modo: limiar}, os que a validação escolheu), eles são só aplicados
+    (teste ou validação externa; coluna `limiar_validacao`).
+
+    Retorna um DataFrame com uma linha por modo.
+    """
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
+
+    linhas = []
+
+    for modo, (probabilidades, _) in variantes.items():
+        classes, probabilidades_paciente = agregar_por_paciente(
+            df,
+            probabilidades
+        )
+
+        linha = {
+            "modo": modo,
+            "passagens": MODOS_TTA[modo],
+            "roc_auc": roc_auc_score(classes, probabilidades_paciente),
+            "pr_auc": average_precision_score(
+                classes,
+                probabilidades_paciente
+            )
+        }
+
+        if limiares is None:
+            limiar, sensibilidade, especificidade = escolher_limiar(
+                classes,
+                probabilidades_paciente,
+                sensibilidade_desejada
+            )
+
+            linha.update(
+                sensibilidade=sensibilidade,
+                especificidade=especificidade,
+                limiar=limiar
+            )
+
+        else:
+            limiar = limiares[modo]
+            preditas = probabilidades_paciente >= limiar
+
+            linha.update(
+                sensibilidade=preditas[classes == 1].mean(),
+                especificidade=1 - preditas[classes == 0].mean(),
+                limiar_validacao=limiar
+            )
+
+        linhas.append(linha)
+
+    return pd.DataFrame(linhas).set_index("modo")
+
+
+def limiares_da_validacao(resultado_validacao):
+    """
+    Os limiares que a validação escolheu, no formato de
+    `medir_predicoes`: por olho e por paciente no modo principal e, por
+    paciente, de cada modo de TTA.
+    """
+
+    return {
+        "olho": resultado_validacao["limiar_olho"],
+        "paciente": resultado_validacao["limiar_paciente"],
+        "modos": resultado_validacao["comparacao_tta"]["limiar"]
+    }
+
+
+def medir_predicoes(
+    df,
+    variantes,
+    modo_tta,
+    limiares=None,
+    sensibilidade_desejada=None
 ):
+    """
+    Tudo o que a avaliação mede num conjunto, a partir das predições
+    (`variantes`, de `prever_variantes`, alinhadas com `df`).
+
+    Sem `limiares`, os limiares por olho e por paciente são escolhidos
+    aqui (validação). Com `limiares` (`limiares_da_validacao`), eles só
+    são aplicados: é a medida honesta do teste ou de uma validação
+    externa.
+
+    Retorna um dicionário com o modo de TTA, os limiares, as métricas
+    por olho e por paciente, o kappa da cabeça de grau, a comparação dos
+    modos de TTA e as predições do modo principal.
+    """
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
+
+    predicoes, graus_previstos = variantes[modo_tta]
+
+    classes_olho = df["target"].astype(int).values
+
+    classes_paciente, predicoes_paciente = agregar_por_paciente(
+        df,
+        predicoes
+    )
+
+    sem_ponto = []
+
+    if limiares is None:
+        limiar_olho, sensibilidade_olho, _ = escolher_limiar(
+            classes_olho,
+            predicoes,
+            sensibilidade_desejada
+        )
+
+        limiar_paciente, sensibilidade_paciente, _ = escolher_limiar(
+            classes_paciente,
+            predicoes_paciente,
+            sensibilidade_desejada
+        )
+
+        sem_ponto = [
+            nivel
+            for nivel, sensibilidade in (
+                ("olho", sensibilidade_olho),
+                ("paciente", sensibilidade_paciente)
+            )
+            if sensibilidade is None
+        ]
+
+        comparacao_tta = comparar_modos(
+            df,
+            variantes,
+            sensibilidade_desejada=sensibilidade_desejada
+        )
+
+    else:
+        limiar_olho = limiares["olho"]
+        limiar_paciente = limiares["paciente"]
+
+        comparacao_tta = comparar_modos(
+            df,
+            variantes,
+            limiares=limiares["modos"]
+        )
+
+    return {
+        "modo_tta": modo_tta,
+        "limiares_escolhidos": limiares is None,
+        "sem_ponto": sem_ponto,
+        "limiar_olho": limiar_olho,
+        "limiar_paciente": limiar_paciente,
+        "metricas_olho": _medir_nivel(
+            classes_olho,
+            predicoes,
+            limiar_olho,
+            "por olho"
+        ),
+        "metricas_paciente": _medir_nivel(
+            classes_paciente,
+            predicoes_paciente,
+            limiar_paciente,
+            "por paciente"
+        ),
+        "kappa_grau": kappa_grau(df["level_original"], graus_previstos),
+        "comparacao_tta": comparacao_tta,
+        "predicoes": predicoes,
+        "graus_previstos": graus_previstos
+    }
+
+
+# ============================================================
+# EXIBIÇÃO
+# ============================================================
+
+
+def plotar_matriz_confusao(matriz, limiar, titulo):
     """
     Desenha a matriz de confusão no limiar escolhido.
     """
-
-    matriz = confusion_matrix(
-        classes_verdadeiras,
-        classes_preditas,
-        labels=[0, 1]
-    )
 
     plt.figure(figsize=(8, 6))
 
@@ -309,102 +521,94 @@ def plotar_matriz_confusao(
     plt.tight_layout()
     plt.show()
 
-    return matriz
 
-
-def relatar_desempenho(
-    classes_verdadeiras,
-    probabilidades,
-    limiar,
-    titulo
-):
+def _relatar_nivel(classes, probabilidades, medidas, titulo):
     """
-    Mostra ROC-AUC, PR-AUC, sensibilidade e especificidade no limiar,
-    a matriz de confusão e o relatório de classificação.
-
-    Retorna um dicionário com as métricas.
+    Matriz de confusão, métricas e relatório de classificação de um
+    nível (olho ou paciente).
     """
 
-    if len(np.unique(classes_verdadeiras)) != 2:
-        raise ValueError(
-            f"{titulo}: o conjunto precisa possuir as classes 0 e 1."
-        )
+    limiar = medidas["limiar"]
 
-    classes_preditas = (
-        probabilidades >= limiar
-    ).astype(int)
-
-    matriz = plotar_matriz_confusao(
-        classes_verdadeiras,
-        classes_preditas,
-        limiar,
-        titulo
-    )
-
-    vn, fp, fn, vp = matriz.ravel()
-
-    metricas = {
-        "roc_auc": roc_auc_score(classes_verdadeiras, probabilidades),
-        "pr_auc": average_precision_score(
-            classes_verdadeiras,
-            probabilidades
-        ),
-        "sensibilidade": vp / (vp + fn),
-        "especificidade": vn / (vn + fp),
-        "limiar": limiar,
-        "matriz_confusao": matriz
-    }
+    plotar_matriz_confusao(medidas["matriz_confusao"], limiar, titulo)
 
     print(f"\n{titulo}:")
-    print(f"ROC-AUC: {metricas['roc_auc']:.4f}")
-    print(f"PR-AUC: {metricas['pr_auc']:.4f}")
-    print(
-        f"Sensibilidade no limiar {limiar:.4f}: "
-        f"{metricas['sensibilidade']:.4f}"
-    )
-    print(
-        f"Especificidade no limiar {limiar:.4f}: "
-        f"{metricas['especificidade']:.4f}"
-    )
+    print(f"ROC-AUC: {medidas['roc_auc']:.4f}")
+    print(f"PR-AUC: {medidas['pr_auc']:.4f}")
+    print(f"Sensibilidade no limiar {limiar:.4f}: {medidas['sensibilidade']:.4f}")
+    print(f"Especificidade no limiar {limiar:.4f}: {medidas['especificidade']:.4f}")
 
     print(
         classification_report(
-            classes_verdadeiras,
-            classes_preditas,
+            classes,
+            (probabilidades >= limiar).astype(int),
             target_names=configuracao.ROTULOS_RELATORIO,
             zero_division=0
         )
     )
 
-    return metricas
 
-
-def _escolher_e_informar_limiar(
-    classes_verdadeiras,
-    probabilidades,
-    nivel,
-    sensibilidade_desejada
-):
+def mostrar_avaliacao(df, resultado, titulo, conjunto):
     """
-    Escolhe o limiar de um nível (olho ou paciente) e informa o
-    resultado.
+    Mostra o que `medir_predicoes` mediu: a comparação dos modos de TTA,
+    o kappa da cabeça de grau, os limiares e, por olho e por paciente, a
+    matriz de confusão, as métricas e o relatório de classificação.
     """
 
-    limiar, sensibilidade, especificidade = escolher_limiar(
-        classes_verdadeiras,
-        probabilidades,
-        sensibilidade_desejada
+    print(f"Avaliação principal com {resultado['modo_tta']}.")
+
+    if resultado["limiares_escolhidos"]:
+        print(f"\nModos de TTA, {conjunto} por paciente:")
+    else:
+        print(f"\nModos de TTA, {conjunto} por paciente (limiares da validação):")
+
+    print(resultado["comparacao_tta"].round(4).to_string())
+
+    print(
+        f"\nKappa quadrático da cabeça de grau ({conjunto}): "
+        f"{resultado['kappa_grau']:.4f} "
+        "(Kaggle 2015, topo: 0,85 no teste da competição)"
     )
 
-    print(f"\nLimiar escolhido por {nivel}: {limiar:.4f}")
+    if resultado["limiares_escolhidos"]:
+        for nivel in ("olho", "paciente"):
+            print(f"\nLimiar escolhido por {nivel}: {resultado[f'limiar_{nivel}']:.4f}")
 
-    if sensibilidade is None:
+            if nivel in resultado["sem_ponto"]:
+                print(
+                    "Nenhum limiar atingiu a sensibilidade desejada. "
+                    "Foi utilizado o limiar padrão de 0.5."
+                )
+
         print(
-            "Nenhum limiar atingiu a sensibilidade desejada. "
-            "Foi utilizado o limiar padrão de 0.5."
+            "\nAtenção: os limiares foram escolhidos nesta validação, "
+            "então estes números são otimistas. Compare os experimentos por "
+            "eles; o teste mede só o modelo final escolhido."
         )
 
-    return limiar
+    classes_paciente, predicoes_paciente = agregar_por_paciente(
+        df,
+        resultado["predicoes"]
+    )
+
+    _relatar_nivel(
+        df["target"].astype(int).values,
+        resultado["predicoes"],
+        resultado["metricas_olho"],
+        f"{titulo}, por olho"
+    )
+
+    _relatar_nivel(
+        classes_paciente,
+        predicoes_paciente,
+        resultado["metricas_paciente"],
+        f"{titulo}, por paciente"
+    )
+
+
+# ============================================================
+# AVALIAÇÃO COMPLETA
+# ============================================================
 
 
 def _nome_arquivo(texto):
@@ -416,15 +620,79 @@ def _nome_arquivo(texto):
     return texto.lower().replace(" ", "_")
 
 
+def salvar_predicoes(tabela, nome, pasta_resultados=None):
+    """
+    Grava a tabela de `tabela_predicoes` em
+    `pasta_resultados/predicoes_<nome>.csv` (padrão: a pasta da
+    execução).
+    """
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS
+
+    os.makedirs(pasta_resultados, exist_ok=True)
+
+    caminho = os.path.join(pasta_resultados, f"predicoes_{nome}.csv")
+
+    tabela.to_csv(caminho, index=False)
+
+    print(f"\nPredições salvas em: {caminho}")
+
+    return caminho
+
+
+def avaliar_predicoes(
+    df,
+    variantes,
+    nome_arquivo,
+    titulo,
+    conjunto,
+    modo_tta=None,
+    limiares=None,
+    sensibilidade_desejada=None,
+    pasta_resultados=None
+):
+    """
+    A avaliação de um conjunto depois da predição: grava as predições em
+    CSV, mede (`medir_predicoes`) e mostra (`mostrar_avaliacao`).
+    `variantes` vem de `prever_variantes` ou de qualquer modelo que
+    entregue as mesmas predições por modo de TTA.
+
+    Retorna o resultado de `medir_predicoes` com a tabela de predições
+    (chave "tabela").
+    """
+
+    if modo_tta is None:
+        modo_tta = configuracao.MODO_TTA
+
+    tabela = tabela_predicoes(df, variantes, modo_tta)
+
+    salvar_predicoes(tabela, nome_arquivo, pasta_resultados)
+
+    resultado = medir_predicoes(
+        df,
+        variantes,
+        modo_tta,
+        limiares,
+        sensibilidade_desejada
+    )
+
+    resultado["tabela"] = tabela
+
+    mostrar_avaliacao(df, resultado, titulo, conjunto)
+
+    return resultado
+
+
 def avaliar_modelo(
     modelo,
     val_data,
     df_val,
     historico,
     nome_fase,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA,
-    pasta_resultados=configuracao.PASTA_RESULTADOS,
-    modo_tta=configuracao.MODO_TTA
+    sensibilidade_desejada=None,
+    pasta_resultados=None,
+    modo_tta=None
 ):
     """
     Executa a avaliação completa de uma fase de treino na validação:
@@ -443,150 +711,23 @@ def avaliar_modelo(
     reutilizados por `avaliar_no_teste`.
     """
 
-    # 1. GRÁFICOS DO TREINAMENTO
     if historico is not None:
         plotar_historico(historico, nome_fase)
 
-    # 2. PROBABILIDADES NA VALIDAÇÃO
     print("\nGerando probabilidades na validação...")
 
     variantes = prever_variantes(modelo, val_data)
 
-    predicoes, graus_previstos = variantes[modo_tta]
-
-    print(f"Avaliação principal com {modo_tta}.")
-
-    colunas_extras = {}
-
-    for modo, (probabilidades_modo, graus_modo) in variantes.items():
-        colunas_extras[f"prob_doente_{modo}"] = probabilidades_modo
-        colunas_extras[f"grau_previsto_{modo}"] = graus_modo
-
-    tabela = salvar_predicoes(
-        df_val,
-        predicoes,
-        graus_previstos,
-        f"validacao_{_nome_arquivo(nome_fase)}",
-        pasta_resultados,
-        colunas_extras
-    )
-
-    comparacao_tta = comparar_modos_tta(
+    return avaliar_predicoes(
         df_val,
         variantes,
-        sensibilidade_desejada
+        f"validacao_{_nome_arquivo(nome_fase)}",
+        f"{nome_fase} — validação",
+        "validação",
+        modo_tta=modo_tta,
+        sensibilidade_desejada=sensibilidade_desejada,
+        pasta_resultados=pasta_resultados
     )
-
-    kappa = kappa_grau(df_val["level_original"], graus_previstos)
-
-    print(
-        f"\nKappa quadrático da cabeça de grau (validação): {kappa:.4f} "
-        "(Kaggle 2015, topo: 0,85 no teste da competição)"
-    )
-
-    classes_olho = df_val["target"].astype(int).values
-
-    classes_paciente, predicoes_paciente = agregar_por_paciente(
-        df_val,
-        predicoes
-    )
-
-    # 3. ESCOLHA DOS LIMIARES
-    limiar_olho = _escolher_e_informar_limiar(
-        classes_olho,
-        predicoes,
-        "olho",
-        sensibilidade_desejada
-    )
-
-    limiar_paciente = _escolher_e_informar_limiar(
-        classes_paciente,
-        predicoes_paciente,
-        "paciente",
-        sensibilidade_desejada
-    )
-
-    # 4. MATRIZES E RELATÓRIOS
-    print(
-        "\nAtenção: os limiares foram escolhidos nesta validação, "
-        "então estes números são otimistas. Compare os experimentos por "
-        "eles; o teste mede só o modelo final escolhido."
-    )
-
-    metricas_olho = relatar_desempenho(
-        classes_olho,
-        predicoes,
-        limiar_olho,
-        f"{nome_fase} — validação, por olho"
-    )
-
-    metricas_paciente = relatar_desempenho(
-        classes_paciente,
-        predicoes_paciente,
-        limiar_paciente,
-        f"{nome_fase} — validação, por paciente"
-    )
-
-    return {
-        "modo_tta": modo_tta,
-        "limiar_olho": limiar_olho,
-        "limiar_paciente": limiar_paciente,
-        "metricas_olho": metricas_olho,
-        "metricas_paciente": metricas_paciente,
-        "kappa_grau": kappa,
-        "comparacao_tta": comparacao_tta,
-        "predicoes": predicoes,
-        "tabela": tabela
-    }
-
-
-def comparar_modos_tta(
-    df,
-    variantes,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
-):
-    """
-    Compara, por paciente, as predições sem TTA, com TTA de 2 e de 4
-    variantes: ROC-AUC, AP e especificidade no limiar que dá a
-    sensibilidade desejada (escolhido em cada modo). Um limiar escolhido
-    com TTA não vale para a inferência sem TTA, e vice-versa.
-
-    Retorna um DataFrame com uma linha por modo.
-    """
-
-    linhas = []
-
-    for modo, (probabilidades, _) in variantes.items():
-        classes, probabilidades_paciente = agregar_por_paciente(
-            df,
-            probabilidades
-        )
-
-        limiar, sensibilidade, especificidade = escolher_limiar(
-            classes,
-            probabilidades_paciente,
-            sensibilidade_desejada
-        )
-
-        linhas.append({
-            "modo": modo,
-            "passagens": MODOS_TTA[modo],
-            "roc_auc": roc_auc_score(classes, probabilidades_paciente),
-            "pr_auc": average_precision_score(
-                classes,
-                probabilidades_paciente
-            ),
-            "sensibilidade": sensibilidade,
-            "especificidade": especificidade,
-            "limiar": limiar
-        })
-
-    tabela = pd.DataFrame(linhas).set_index("modo")
-
-    print("\nModos de TTA, validação por paciente:")
-    print(tabela.round(4).to_string())
-
-    return tabela
 
 
 def avaliar_no_teste(
@@ -595,8 +736,8 @@ def avaliar_no_teste(
     df_teste,
     resultado_validacao,
     nome="Teste",
-    pasta_resultados=configuracao.PASTA_RESULTADOS,
-    liberado=configuracao.AVALIAR_TESTE
+    pasta_resultados=None,
+    liberado=None
 ):
     """
     Avalia o modelo no conjunto de teste usando os limiares escolhidos
@@ -604,18 +745,19 @@ def avaliar_no_teste(
     honesta do desempenho do modelo. As predições são salvas em CSV em
     `pasta_resultados`.
 
-    Só roda com `liberado=True` (RETINOPATIA_AVALIAR_TESTE=1, modelo
-    final). Nos experimentos devolve None sem tocar no teste.
+    Só roda com `liberado=True` (padrão: RETINOPATIA_AVALIAR_TESTE=1,
+    modelo final). Nos experimentos devolve None sem tocar no teste.
 
     A avaliação principal usa o modo de TTA da validação. Os três modos
     também são medidos por paciente, cada um com o limiar que a
     validação escolheu para ele: o teste diz quanto custa, em acerto,
     rodar a rede 1, 2 ou 4 vezes no celular.
 
-    Retorna um dicionário com as métricas por olho e por paciente, a
-    comparação dos modos de TTA e as predições do teste (vetor e tabela
-    por imagem).
+    Retorna o resultado de `medir_predicoes` com a tabela de predições.
     """
+
+    if liberado is None:
+        liberado = configuracao.AVALIAR_TESTE
 
     if not liberado:
         print(
@@ -627,121 +769,32 @@ def avaliar_no_teste(
 
     print("\nGerando probabilidades no teste...")
 
-    modo_tta = resultado_validacao.get("modo_tta", configuracao.MODO_TTA)
-
     variantes = prever_variantes(modelo, teste_data)
 
-    predicoes, graus_previstos = variantes[modo_tta]
-
-    colunas_extras = {}
-
-    for modo, (probabilidades_modo, graus_modo) in variantes.items():
-        colunas_extras[f"prob_doente_{modo}"] = probabilidades_modo
-        colunas_extras[f"grau_previsto_{modo}"] = graus_modo
-
-    tabela = salvar_predicoes(
-        df_teste,
-        predicoes,
-        graus_previstos,
-        _nome_arquivo(nome),
-        pasta_resultados,
-        colunas_extras
-    )
-
-    comparacao_tta = _comparar_modos_no_teste(
+    return avaliar_predicoes(
         df_teste,
         variantes,
-        resultado_validacao["comparacao_tta"]["limiar"]
+        _nome_arquivo(nome),
+        nome,
+        "teste",
+        modo_tta=resultado_validacao.get("modo_tta", configuracao.MODO_TTA),
+        limiares=limiares_da_validacao(resultado_validacao),
+        pasta_resultados=pasta_resultados
     )
 
-    classes_paciente, predicoes_paciente = agregar_por_paciente(
-        df_teste,
-        predicoes
-    )
 
-    metricas_olho = relatar_desempenho(
-        df_teste["target"].astype(int).values,
-        predicoes,
-        resultado_validacao["limiar_olho"],
-        f"{nome} — por olho"
-    )
+# ============================================================
+# REGISTRO DOS EXPERIMENTOS
+# ============================================================
 
-    metricas_paciente = relatar_desempenho(
-        classes_paciente,
-        predicoes_paciente,
-        resultado_validacao["limiar_paciente"],
-        f"{nome} — por paciente"
-    )
+
+def identificacao_execucao():
+    """
+    As colunas que identificam a execução no resumo: experimento,
+    commit e a configuração principal, lidas da `configuracao` ativa.
+    """
 
     return {
-        "modo_tta": modo_tta,
-        "metricas_olho": metricas_olho,
-        "metricas_paciente": metricas_paciente,
-        "comparacao_tta": comparacao_tta,
-        "predicoes": predicoes,
-        "tabela": tabela
-    }
-
-
-def _comparar_modos_no_teste(df_teste, variantes, limiares_validacao):
-    """
-    Métricas por paciente no teste para cada modo de TTA, no limiar que
-    a validação escolheu para aquele modo.
-    """
-
-    linhas = []
-
-    for modo, (probabilidades, _) in variantes.items():
-        classes, probabilidades_paciente = agregar_por_paciente(
-            df_teste,
-            probabilidades
-        )
-
-        limiar = limiares_validacao[modo]
-        preditas = probabilidades_paciente >= limiar
-
-        linhas.append({
-            "modo": modo,
-            "passagens": MODOS_TTA[modo],
-            "roc_auc": roc_auc_score(classes, probabilidades_paciente),
-            "pr_auc": average_precision_score(classes, probabilidades_paciente),
-            "sensibilidade": preditas[classes == 1].mean(),
-            "especificidade": 1 - preditas[classes == 0].mean(),
-            "limiar_validacao": limiar
-        })
-
-    tabela = pd.DataFrame(linhas).set_index("modo")
-
-    print("\nModos de TTA, teste por paciente (limiares da validação):")
-    print(tabela.round(4).to_string())
-
-    return tabela
-
-
-def registrar_experimento(
-    resultado_validacao,
-    resultado_teste=None,
-    pasta_resultados=configuracao.PASTA_RESULTADOS,
-    extras=None
-):
-    """
-    Grava o resumo desta execução em `pasta_resultados/resumo.csv`:
-    experimento, commit, configuração principal, limiares, métricas de
-    validação por olho e por paciente, kappa da cabeça de grau e a
-    especificidade de cada modo de TTA. As métricas de teste só entram
-    quando `resultado_teste` é passado (modelo final).
-
-    A tabela geral é montada depois por `consolidar_experimentos`: cada
-    sessão grava só o próprio resumo, e sessões em paralelo não perdem
-    linhas.
-
-    Para escolher entre experimentos, compare as colunas de validação;
-    as de teste só valem para o modelo final escolhido. `extras` acrescenta
-    colunas (por exemplo, o arquivo do modelo avaliado).
-    """
-
-    linha = {
-        "data": pd.Timestamp.now().isoformat(timespec="seconds"),
         "experimento": configuracao.NOME_EXPERIMENTO,
         "nome_experimento": configuracao.EXPERIMENTO,
         "modelo": configuracao.NOME_MODELO,
@@ -753,7 +806,42 @@ def registrar_experimento(
         "seed_treino": configuracao.SEED_TREINO,
         "modelo_pares": configuracao.MODELO_PARES,
         "destilacao": configuracao.DESTILACAO,
-        "fumaca": configuracao.FUMACA,
+        "fumaca": configuracao.FUMACA
+    }
+
+
+def registrar_experimento(
+    resultado_validacao,
+    resultado_teste=None,
+    pasta_resultados=None,
+    extras=None,
+    identificacao=None
+):
+    """
+    Grava o resumo desta execução em `pasta_resultados/resumo.csv`:
+    a identificação da execução (padrão: `identificacao_execucao`),
+    limiares, métricas de validação por olho e por paciente, kappa da
+    cabeça de grau e a especificidade de cada modo de TTA. As métricas
+    de teste só entram quando `resultado_teste` é passado (modelo final).
+
+    A tabela geral é montada depois por `consolidar_experimentos`: cada
+    sessão grava só o próprio resumo, e sessões em paralelo não perdem
+    linhas.
+
+    Para escolher entre experimentos, compare as colunas de validação;
+    as de teste só valem para o modelo final escolhido. `extras` acrescenta
+    colunas (por exemplo, o arquivo do modelo avaliado).
+    """
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS
+
+    if identificacao is None:
+        identificacao = identificacao_execucao()
+
+    linha = {
+        "data": pd.Timestamp.now().isoformat(timespec="seconds"),
+        **identificacao,
         "modo_tta": resultado_validacao.get("modo_tta"),
         "limiar_olho": resultado_validacao["limiar_olho"],
         "limiar_paciente": resultado_validacao["limiar_paciente"],
@@ -768,11 +856,11 @@ def registrar_experimento(
             continue
 
         for nivel in ("olho", "paciente"):
-            metricas = resultado[f"metricas_{nivel}"]
+            medidas = resultado[f"metricas_{nivel}"]
 
             for nome in ("roc_auc", "pr_auc", "sensibilidade", "especificidade"):
                 linha[f"{conjunto}_{nivel}_{nome}"] = round(
-                    float(metricas[nome]),
+                    float(medidas[nome]),
                     4
                 )
 
@@ -783,9 +871,9 @@ def registrar_experimento(
         if resultado is None or "comparacao_tta" not in resultado:
             continue
 
-        for modo, metricas in resultado["comparacao_tta"].iterrows():
+        for modo, medidas in resultado["comparacao_tta"].iterrows():
             for nome in ("roc_auc", "especificidade"):
-                valor = metricas[nome]
+                valor = medidas[nome]
                 linha[f"{conjunto}_paciente_{nome}_{modo}"] = (
                     None if pd.isna(valor) else round(float(valor), 4)
                 )
@@ -808,8 +896,8 @@ def registrar_experimento(
 
 
 def consolidar_experimentos(
-    pasta_resultados_geral=configuracao.PASTA_RESULTADOS_GERAL,
-    caminho_registro=configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
+    pasta_resultados_geral=None,
+    caminho_registro=None
 ):
     """
     Atualiza o registro geral de experimentos com os `resumo.csv` de
@@ -822,6 +910,12 @@ def consolidar_experimentos(
 
     Retorna o registro consolidado.
     """
+
+    if pasta_resultados_geral is None:
+        pasta_resultados_geral = configuracao.PASTA_RESULTADOS_GERAL
+
+    if caminho_registro is None:
+        caminho_registro = configuracao.CAMINHO_REGISTRO_EXPERIMENTOS
 
     tabelas = []
 
