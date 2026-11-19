@@ -164,19 +164,14 @@ def _restaurar_imagens_preparadas():
     os rótulos. Falta de cache aqui é erro, não motivo para processar.
     """
 
+    from . import fontes
+
     pastas = [(configuracao.PASTA_IMAGENS_OTIMIZADAS, configuracao.CAMINHOS_ZIP_CACHE)]
 
-    if configuracao.USAR_DADOS_EXTRA:
-        pastas.append((
-            configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA,
-            configuracao.CAMINHOS_ZIP_CACHE_EXTRA
-        ))
-
-    for nome in configuracao.DATASETS_EXTERNOS:
-        pastas.append((
-            configuracao.PASTAS_IMAGENS_EXTERNAS[nome],
-            configuracao.CAMINHOS_ZIP_CACHE_EXTERNOS[nome]
-        ))
+    pastas += [
+        (fonte.pasta_processada, list(fonte.caminhos_zip_cache))
+        for fonte in fontes.fontes_de_treino()
+    ]
 
     for pasta, caminhos_zip in pastas:
         if not ambiente_colab.restaurar_cache_imagens(pasta, caminhos_zip):
@@ -199,7 +194,7 @@ def preparar_dados(imagens_no_disco=False):
     Retorna um `ConjuntosExperimento`.
     """
 
-    from . import conjunto_dados, treinamento
+    from . import conjunto_dados, fontes, treinamento
 
     if imagens_no_disco:
         _restaurar_imagens_preparadas()
@@ -215,7 +210,7 @@ def preparar_dados(imagens_no_disco=False):
 
     # Fotos só para o treino: extras de 2015 e datasets externos do
     # experimento (cache do Drive se existir, senão processadas aqui)
-    df_adicionais = ambiente_colab.preparar_dados_adicionais(dados)
+    df_adicionais = fontes.preparar_dados_adicionais(dados)
 
     if df_adicionais is not None:
         df_treino = conjunto_dados.ampliar_treino(df_treino, df_adicionais)
@@ -358,9 +353,11 @@ def preparar_imagens():
     experimento (a destilação usaria a GPU neste processo).
     """
 
+    from . import fontes
+
     dados, *_ = preparar_imagens_eyepacs()
 
-    ambiente_colab.preparar_dados_adicionais(dados)
+    fontes.preparar_dados_adicionais(dados)
 
 
 def _memoria_total_gb():

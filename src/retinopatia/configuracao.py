@@ -299,8 +299,6 @@ CAMINHOS_ZIP_CACHE = [
     os.path.join(PASTA_CACHE_DRIVE, _NOME_ZIP_CACHE)
 ]
 
-# Onde um cache novo é gravado (só com GRAVAR_CACHE)
-CAMINHO_ZIP_CACHE = CAMINHOS_ZIP_CACHE[0]
 
 # Pasta da lista de máscaras suspeitas: junto do cache quando ele é
 # gerado na conta pessoal; nos dados internos do projeto nos demais casos
@@ -359,7 +357,6 @@ CAMINHOS_ZIP_CACHE_EXTRA = [
     os.path.join(PASTA_CACHE_DRIVE, _NOME_ZIP_CACHE_EXTRA)
 ]
 
-CAMINHO_ZIP_CACHE_EXTRA = CAMINHOS_ZIP_CACHE_EXTRA[0]
 
 CAMINHO_LISTA_SUSPEITAS_EXTRA = os.path.join(
     _PASTA_LISTAS,
