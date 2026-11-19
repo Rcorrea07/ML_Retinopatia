@@ -36,13 +36,12 @@ import tensorflow as tf
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
-    cohen_kappa_score,
     confusion_matrix,
-    roc_auc_score,
-    roc_curve
+    roc_auc_score
 )
 
-from . import configuracao
+from . import configuracao, metricas
+from .metricas import kappa_grau  # noqa: F401 (parte da interface da avaliação)
 
 
 def _serie_historico(historico, nomes):
@@ -180,69 +179,25 @@ def prever_variantes(modelo, dados):
     }
 
 
-def kappa_grau(niveis_reais, graus_previstos):
-    """
-    Kappa quadrático da cabeça de grau (regressão arredondada para o
-    inteiro mais próximo, limitada a 0–4). É a métrica do Kaggle EyePACS
-    2015 (topo: 0,85 no teste da competição), calculada aqui na
-    validação do projeto: serve de referência, não de comparação exata.
-    """
-
-    previstos = np.clip(np.rint(graus_previstos), 0, 4).astype(int)
-
-    return cohen_kappa_score(
-        np.asarray(niveis_reais).astype(int),
-        previstos,
-        weights="quadratic"
-    )
-
-
-def _agregar(valores, funcao):
-    """
-    Combina os valores dos olhos de um paciente:
-    "max" (o maior), "media" ou "max_media" (média dos dois anteriores).
-    """
-
-    if funcao == "max":
-        return valores.max()
-
-    if funcao == "media":
-        return valores.mean()
-
-    if funcao == "max_media":
-        return (valores.max() + valores.mean()) / 2
-
-    raise ValueError(f"Agregação desconhecida: {funcao}")
-
-
 def agregar_por_paciente(df, probabilidades, funcao="max"):
     """
     Combina os dois olhos de cada paciente: a classe do paciente é 1 se
     qualquer olho estiver doente, e a probabilidade é, por padrão, a
-    maior entre as dos dois olhos (ver `_agregar` para as alternativas).
+    maior entre as dos dois olhos (`metricas.agregar_olhos` lista as
+    alternativas).
 
     Retorna:
         (classes_paciente, probabilidades_paciente)
     """
 
-    por_olho = pd.DataFrame({
-        "patient_id": df["patient_id"].values,
-        "target": df["target"].astype(int).values,
-        "probabilidade": probabilidades
-    })
-
-    por_paciente = por_olho.groupby("patient_id").agg(
-        target=("target", "max"),
-        probabilidade=(
-            "probabilidade",
-            lambda valores: _agregar(valores, funcao)
-        )
+    pacientes = metricas.por_paciente(
+        df["patient_id"].values,
+        df["target"].values,
+        probabilidades,
+        funcao
     )
 
-    return (
-        por_paciente["target"].values,
-        por_paciente["probabilidade"].values
-    )
+    return pacientes["target"].values, pacientes["valor"].values
 
 
 def salvar_predicoes(
@@ -305,27 +260,16 @@ def escolher_limiar(
     padrão de 0.5 e None nas outras duas posições.
     """
 
-    fpr, tpr, thresholds = roc_curve(
+    limiar, sensibilidade, especificidade = metricas.ponto_na_sensibilidade(
         classes_verdadeiras,
-        predicoes
+        predicoes,
+        sensibilidade_desejada
     )
 
-    indices_validos = np.where(
-        tpr >= sensibilidade_desejada
-    )[0]
+    if limiar is None:
+        return 0.5, None, None
 
-    if len(indices_validos) > 0:
-        melhor_indice = indices_validos[
-            np.argmin(fpr[indices_validos])
-        ]
-
-        return (
-            thresholds[melhor_indice],
-            tpr[melhor_indice],
-            1 - fpr[melhor_indice]
-        )
-
-    return 0.5, None, None
+    return limiar, sensibilidade, especificidade
 
 
 def plotar_matriz_confusao(
