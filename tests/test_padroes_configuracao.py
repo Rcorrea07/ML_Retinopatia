@@ -3,8 +3,9 @@ Regras de estrutura do pacote, conferidas sem TensorFlow.
 
 - Parâmetro padrão que lê a `configuracao` (`def f(x=configuracao.X)`)
   guarda o valor do momento do import: o `%autoreload` e um segundo
-  experimento no mesmo processo não o mudam. `LIMITE_POR_MODULO` é a
-  contagem de 19/11/2026; ela só pode diminuir até zerar.
+  experimento no mesmo processo não o mudam. O padrão é None (ou um
+  marcador, onde None já tem significado) e a função lê a configuração
+  na hora. Em 19/11/2026 eram 131 casos; desde a refatoração, nenhum.
 - O notebook de treinos paralelos não importa TensorFlow: `execucao`,
   `configuracao` e `experimentos` precisam importar sem ele.
 
@@ -20,23 +21,6 @@ from pathlib import Path
 
 PASTA_SRC = Path(__file__).resolve().parents[1] / "src"
 PASTA_PACOTE = PASTA_SRC / "retinopatia"
-
-# Parâmetros padrão que leem `configuracao`, por módulo (19/11/2026)
-LIMITE_POR_MODULO = {
-    "ambiente_colab": 18,
-    "analise": 3,
-    "avaliacao": 11,
-    "conjunto_dados": 21,
-    "datasets_externos": 2,
-    "diagnostico": 15,
-    "execucao": 2,
-    "modelo": 11,
-    "modelo_final": 7,
-    "pipeline_dados": 12,
-    "pre_processamento": 21,
-    "treinamento": 15,
-    "utilitarios": 4,
-}
 
 
 def padroes_da_configuracao(caminho):
@@ -71,15 +55,13 @@ def padroes_da_configuracao(caminho):
 
 class EstruturaDoPacote(unittest.TestCase):
 
-    def test_padroes_da_configuracao_so_diminuem(self):
+    def test_nenhum_padrao_le_a_configuracao(self):
         for caminho in sorted(PASTA_PACOTE.glob("*.py")):
-            modulo = caminho.stem
-
-            with self.subTest(modulo=modulo):
-                self.assertLessEqual(
+            with self.subTest(modulo=caminho.stem):
+                self.assertEqual(
                     padroes_da_configuracao(caminho),
-                    LIMITE_POR_MODULO.get(modulo, 0),
-                    f"{modulo}: leia a configuracao dentro da função "
+                    0,
+                    f"{caminho.stem}: leia a configuracao dentro da função "
                     "(parâmetro padrão None), não no padrão do parâmetro"
                 )
 

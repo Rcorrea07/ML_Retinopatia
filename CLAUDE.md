@@ -90,7 +90,7 @@ There is no linter config or build step.
 
 ## Conventions and gotchas
 
-- **Hyperparameters live only in `configuracao.py`; per-experiment changes only in `experimentos.py`.** Don't reintroduce inline literals in modules or notebook cells; add a named constant instead. `RETINOPATIA_BACKBONE` still works as a fallback when the experiment does not set `BACKBONE`.
+- **Hyperparameters live only in `configuracao.py`; per-experiment changes only in `experimentos.py`.** Don't reintroduce inline literals in modules or notebook cells; add a named constant instead. A function never takes a `configuracao` value as a parameter default (`def f(x=configuracao.X)` freezes it at import, which autoreload and a second experiment in the same process don't undo): the default is `None` and the body reads `configuracao.X` at call time (`_PADRAO` sentinel where `None` already means something). `tests/test_padroes_configuracao.py` enforces it.
 - **The training notebook's metadata asks for an A100 with high RAM** (`gpuType`/`machine_shape`). It used to say T4, and the October campaign ran ~5× slower because of it. Keep `fit(verbose=2)`: per-batch progress bars produced 20 MB logs and froze the browser tab.
 - **No IPython magics in `.py` files.** `!unzip`/`!cat` were converted to `subprocess.run(..., shell=True, check=True)` in `ambiente_colab.py`; shell escapes only work in notebook cells.
 - **Both phases share one evaluation function and one callback factory** (`avaliar_modelo`, `criar_callbacks` + the `criar_callbacks_fase1/2` wrappers) and one compile function (`compilar_modelo`), and the visual inspection shares `processar_retina` with the batch pass. These were duplicated in the original notebook — keep them unified, parameterizing instead of copying.
