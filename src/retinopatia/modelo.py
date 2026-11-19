@@ -66,10 +66,13 @@ class GeM(layers.Layer):
 
     def __init__(
         self,
-        p_inicial=configuracao.GEM_P_INICIAL,
+        p_inicial=None,
         eps=1e-6,
         **kwargs
     ):
+        if p_inicial is None:
+            p_inicial = configuracao.GEM_P_INICIAL
+
         kwargs.setdefault("dtype", "float32")
         super().__init__(**kwargs)
 
@@ -130,9 +133,9 @@ def criar_metricas():
 def compilar_modelo(
     modelo,
     taxa_aprendizado,
-    peso_perda_grau=configuracao.PESO_PERDA_GRAU,
-    delta_huber=configuracao.DELTA_HUBER,
-    compilacao_xla=configuracao.COMPILACAO_XLA
+    peso_perda_grau=None,
+    delta_huber=None,
+    compilacao_xla=None
 ):
     """
     Compila o modelo com as perdas e métricas das duas saídas.
@@ -142,6 +145,15 @@ def compilar_modelo(
     `taxa_aprendizado` pode ser um número ou um agendamento do Keras
     (a Fase 2 usa cosseno com aquecimento).
     """
+
+    if peso_perda_grau is None:
+        peso_perda_grau = configuracao.PESO_PERDA_GRAU
+
+    if delta_huber is None:
+        delta_huber = configuracao.DELTA_HUBER
+
+    if compilacao_xla is None:
+        compilacao_xla = configuracao.COMPILACAO_XLA
 
     perdas = {
         configuracao.SAIDA_DOENTE: tf.keras.losses.BinaryCrossentropy(),
@@ -206,11 +218,11 @@ def _criar_extrator(modelo_base, formato_entrada):
 
 
 def construir_modelo(
-    formato_entrada=configuracao.FORMATO_ENTRADA,
-    nome_backbone=configuracao.BACKBONE,
-    taxa_aprendizado=configuracao.TAXA_APRENDIZADO_FASE1,
+    formato_entrada=None,
+    nome_backbone=None,
+    taxa_aprendizado=None,
     mostrar_resumo=True,
-    pares=configuracao.MODELO_PARES
+    pares=None
 ):
     """
     Monta e compila o modelo da Fase 1, com a rede base congelada.
@@ -225,6 +237,18 @@ def construir_modelo(
     O `modelo_base` é devolvido separadamente porque o fine-tuning
     precisa dele para descongelar as camadas.
     """
+
+    if formato_entrada is None:
+        formato_entrada = configuracao.FORMATO_ENTRADA
+
+    if nome_backbone is None:
+        nome_backbone = configuracao.BACKBONE
+
+    if taxa_aprendizado is None:
+        taxa_aprendizado = configuracao.TAXA_APRENDIZADO_FASE1
+
+    if pares is None:
+        pares = configuracao.MODELO_PARES
 
     if nome_backbone not in BACKBONES:
         raise ValueError(
@@ -334,8 +358,8 @@ def carregar_modelo_salvo(caminho):
 
 def construir_modelo_inferencia(
     modelo_treinado,
-    formato_entrada=configuracao.FORMATO_ENTRADA,
-    nome_backbone=configuracao.BACKBONE
+    formato_entrada=None,
+    nome_backbone=None
 ):
     """
     Versão para o celular de um modelo treinado (de uma imagem, sem
@@ -353,6 +377,12 @@ def construir_modelo_inferencia(
     pelo desvio padrão da ImageNet, que não tem pesos. A cópia passa, mas
     a rede prevê outra coisa (diferença de 0,81 no primeiro R09).
     """
+
+    if formato_entrada is None:
+        formato_entrada = configuracao.FORMATO_ENTRADA
+
+    if nome_backbone is None:
+        nome_backbone = configuracao.BACKBONE
 
     politica = tf.keras.mixed_precision.global_policy()
     tf.keras.mixed_precision.set_global_policy("float32")
@@ -413,7 +443,7 @@ def construir_modelo_inferencia(
 def salvar_modelo_final(
     modelo,
     dados,
-    caminho=configuracao.CAMINHO_MODELO_FINAL
+    caminho=None
 ):
     """
     Salva o modelo completo (arquitetura + pesos) e confere a gravação:
@@ -421,6 +451,9 @@ def salvar_modelo_final(
     num lote de `dados`. Um erro de serialização (por exemplo, da camada
     GeM ou do modelo de pares) aparece aqui, e não meses depois na API.
     """
+
+    if caminho is None:
+        caminho = configuracao.CAMINHO_MODELO_FINAL
 
     import numpy as np
 
