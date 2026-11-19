@@ -440,3 +440,230 @@ def ensemble(tabelas):
     resultado["grau"] = np.mean(graus, axis=0)
 
     return resultado
+
+
+# ============================================================
+# RETRATO PARA A REFATORAÇÃO
+# ============================================================
+
+
+def _linhas_tabela(tabela, execucao, modo, parte):
+    """
+    Uma tabela de resultados (índice e colunas numéricas) em formato
+    longo: uma linha por célula.
+    """
+
+    linhas = []
+
+    for item, valores in tabela.iterrows():
+        for metrica, valor in valores.items():
+            if isinstance(valor, (int, float, np.integer, np.floating, bool, np.bool_)):
+                linhas.append({
+                    "execucao": execucao,
+                    "modo": modo,
+                    "parte": parte,
+                    "item": str(item),
+                    "metrica": str(metrica),
+                    "valor": float(valor)
+                })
+
+    return linhas
+
+
+def retrato_metricas(
+    rotulo,
+    pasta_saida=None,
+    execucoes=None,
+    padrao_diagnostico=r"^R1[02]_b0_768.*_seed42_"
+):
+    """
+    Recalcula, a partir das predições de validação salvas, tudo o que a
+    avaliação e o diagnóstico medem, e grava em
+    `resultados/regressao/<rotulo>_metricas.csv` (uma linha por número,
+    com precisão total):
+
+    - limiares, sensibilidade e especificidade por olho e por paciente,
+      ROC-AUC, AP e kappa de cada execução e modo de TTA (funções de
+      `avaliacao`);
+    - a tabela comparativa deste módulo;
+    - a comparação dos modos de TTA de cada execução;
+    - nas execuções que casam com `padrao_diagnostico`, com TTA2: erros
+      por grau, referenciável, agregação dos olhos e bootstrap (funções
+      de `diagnostico`).
+
+    Rodado antes ("antes") e depois ("depois") de uma refatoração, os
+    dois arquivos devem bater (`conferir_regressao`). Importa
+    TensorFlow (por `avaliacao`): rode no Colab.
+
+    Retorna a tabela gravada.
+    """
+
+    import contextlib
+    import io
+
+    from . import avaliacao, diagnostico
+
+    if execucoes is None:
+        execucoes = listar_execucoes()
+
+    if pasta_saida is None:
+        pasta_saida = os.path.join(configuracao.PASTA_RESULTADOS_GERAL, "regressao")
+
+    linhas = []
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        for nome, modos in execucoes.items():
+            for modo, tabela in modos.items():
+                classes_olho = tabela["target"].values
+                probs_olho = tabela["prob"].values
+
+                classes_paciente, probs_paciente = avaliacao.agregar_por_paciente(
+                    tabela,
+                    probs_olho
+                )
+
+                medidas = {}
+
+                for nivel, classes, probs in (
+                    ("olho", classes_olho, probs_olho),
+                    ("paciente", classes_paciente, probs_paciente)
+                ):
+                    limiar, sensibilidade, especificidade = avaliacao.escolher_limiar(
+                        classes,
+                        probs
+                    )
+
+                    medidas.update({
+                        f"{nivel}_limiar": limiar,
+                        f"{nivel}_sensibilidade": np.nan if sensibilidade is None else sensibilidade,
+                        f"{nivel}_especificidade": np.nan if especificidade is None else especificidade,
+                        f"{nivel}_roc_auc": roc_auc_score(classes, probs),
+                        f"{nivel}_ap": average_precision_score(classes, probs)
+                    })
+
+                medidas["kappa_grau"] = avaliacao.kappa_grau(
+                    tabela["level_original"],
+                    tabela["grau"]
+                )
+
+                linhas += _linhas_tabela(
+                    pd.DataFrame([medidas], index=["avaliacao"]),
+                    nome,
+                    modo,
+                    "avaliacao"
+                )
+
+            if set(modos) == set(MODOS):
+                base = modos["sem_tta"]
+
+                variantes = {
+                    modo: (modos[modo]["prob"].values, modos[modo]["grau"].values)
+                    for modo in MODOS
+                }
+
+                linhas += _linhas_tabela(
+                    avaliacao.comparar_modos_tta(base, variantes),
+                    nome,
+                    "todos",
+                    "modos_tta"
+                )
+
+            if re.search(padrao_diagnostico, nome) and "tta2" in modos:
+                tabela = modos["tta2"].rename(
+                    columns={"prob": "prob_doente", "grau": "grau_previsto"}
+                )
+
+                limiar_olho, _, _ = avaliacao.escolher_limiar(
+                    tabela["target"].values,
+                    tabela["prob_doente"].values
+                )
+
+                limiar_paciente, _, _ = avaliacao.escolher_limiar(
+                    *avaliacao.agregar_por_paciente(tabela, tabela["prob_doente"].values)
+                )
+
+                partes = {
+                    "por_grau": diagnostico.relatorio_por_grau(tabela, limiar_olho),
+                    "referenciavel": diagnostico.avaliar_referenciavel(tabela, tabela),
+                    "agregacao": diagnostico.comparar_agregacao_paciente(tabela),
+                    "bootstrap": diagnostico.intervalo_bootstrap(
+                        tabela,
+                        limiar_olho,
+                        limiar_paciente
+                    )
+                }
+
+                for parte, resultado in partes.items():
+                    linhas += _linhas_tabela(resultado, nome, "tta2", parte)
+
+    linhas += _linhas_tabela(
+        tabela_comparativa(execucoes).set_index(["execucao", "modo"]).drop(columns="referencia"),
+        "todas",
+        "todos",
+        "comparativa"
+    )
+
+    retrato = pd.DataFrame(linhas)
+
+    os.makedirs(pasta_saida, exist_ok=True)
+
+    caminho = os.path.join(pasta_saida, f"{rotulo}_metricas.csv")
+    retrato.to_csv(caminho, index=False, float_format="%.17g")
+
+    print(f"Retrato '{rotulo}': {len(retrato)} números de {len(execucoes)} execuções em {caminho}")
+
+    return retrato
+
+
+def conferir_regressao(
+    antes="antes",
+    depois="depois",
+    pasta=None,
+    tolerancia=1e-9
+):
+    """
+    Compara dois retratos de `retrato_metricas`. Toda linha do retrato
+    `antes` precisa existir no `depois` com o mesmo valor (diferença
+    até `tolerancia`; NaN só bate com NaN).
+
+    Retorna as linhas que diferem (vazio quando a refatoração não mudou
+    nenhum número).
+    """
+
+    if pasta is None:
+        pasta = os.path.join(configuracao.PASTA_RESULTADOS_GERAL, "regressao")
+
+    chaves = ["execucao", "modo", "parte", "item", "metrica"]
+
+    tabelas = [
+        pd.read_csv(os.path.join(pasta, f"{rotulo}_metricas.csv"), dtype={"item": str})
+        for rotulo in (antes, depois)
+    ]
+
+    juntas = tabelas[0].merge(
+        tabelas[1],
+        on=chaves,
+        how="left",
+        suffixes=("_antes", "_depois"),
+        indicator=True
+    )
+
+    antes_valor, depois_valor = juntas["valor_antes"], juntas["valor_depois"]
+
+    iguais = (
+        (antes_valor == depois_valor)
+        | (antes_valor.isna() & depois_valor.isna())
+        | ((antes_valor - depois_valor).abs() <= tolerancia)
+    )
+
+    diferentes = juntas[~iguais | (juntas["_merge"] != "both")].drop(columns="_merge")
+
+    print(
+        f"{len(tabelas[0])} números conferidos: "
+        f"{len(diferentes)} diferentes (tolerância {tolerancia:g})."
+    )
+
+    if not diferentes.empty:
+        print(diferentes.head(20).to_string(index=False))
+
+    return diferentes

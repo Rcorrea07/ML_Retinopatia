@@ -108,6 +108,34 @@ class Analise(unittest.TestCase):
         media = self.analise.ensemble([tabela, tabela])
         self.assertTrue((media["prob"].values == tabela["prob"].values).all())
 
+    def test_conferir_regressao_acusa_numero_diferente_ou_ausente(self):
+        import numpy as np
+        import pandas as pd
+
+        antes = pd.DataFrame({
+            "execucao": ["R01"] * 4,
+            "modo": ["tta2"] * 4,
+            "parte": ["avaliacao"] * 4,
+            "item": ["avaliacao", "avaliacao", "0", "1"],
+            "metrica": ["olho_limiar", "kappa_grau", "olhos", "olhos"],
+            "valor": [0.1926, np.nan, np.inf, 230.0]
+        })
+
+        with tempfile.TemporaryDirectory() as pasta:
+            antes.to_csv(os.path.join(pasta, "antes_metricas.csv"), index=False)
+
+            igual = antes.copy()
+            igual.loc[0, "valor"] += 1e-12
+            igual.to_csv(os.path.join(pasta, "depois_metricas.csv"), index=False)
+            self.assertTrue(self.analise.conferir_regressao(pasta=pasta).empty)
+
+            mudou = antes.iloc[:3].copy()
+            mudou.loc[0, "valor"] = 0.2
+            mudou.to_csv(os.path.join(pasta, "depois_metricas.csv"), index=False)
+            diferentes = self.analise.conferir_regressao(pasta=pasta)
+
+        self.assertEqual(diferentes["metrica"].tolist(), ["olho_limiar", "olhos"])
+
 
 if __name__ == "__main__":
     unittest.main()
