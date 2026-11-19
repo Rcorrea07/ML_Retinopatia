@@ -71,8 +71,6 @@ SEED_TREINO = int(os.environ.get(
     _valor("SEED_TREINO", 42)
 ))
 
-SEED = SEED_TREINO
-
 # Operações determinísticas no TensorFlow. Garantem o mesmo resultado a
 # cada execução, mas podem deixar o treino mais lento ou falhar em
 # operações sem implementação determinística na GPU. Se
@@ -492,12 +490,8 @@ FORMATO_ENTRADA = TAMANHO_IMAGEM + (3,)
 # "EfficientNetB5", "EfficientNetV2B0", "EfficientNetV2S". Todas esperam
 # a entrada na faixa de 0 a 255.
 #
-# Definido pelo experimento; sem ele, pela variável de ambiente
-# RETINOPATIA_BACKBONE (forma antiga de escolher). Sem nenhum dos dois, B4.
-BACKBONE = _valor(
-    "BACKBONE",
-    os.environ.get("RETINOPATIA_BACKBONE", "EfficientNetB4")
-)
+# Definido pelo experimento; sem ele, B4.
+BACKBONE = _valor("BACKBONE", "EfficientNetB4")
 
 # Precisão mista (float16 nos cálculos, float32 nos pesos): quase
 # dobra a velocidade em GPUs L4/A100/T4 e reduz o uso de memória.
