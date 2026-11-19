@@ -114,7 +114,7 @@ def carregar_predicoes(pasta):
     return resultado
 
 
-def listar_execucoes(pasta_resultados=configuracao.PASTA_RESULTADOS_GERAL):
+def listar_execucoes(pasta_resultados=None):
     """
     Pastas de resultados com predições de validação da Fase 2, sem as
     execuções de fumaça.
@@ -122,6 +122,9 @@ def listar_execucoes(pasta_resultados=configuracao.PASTA_RESULTADOS_GERAL):
     Retorna:
         {nome da pasta: {modo: tabela}}
     """
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS_GERAL
 
     execucoes = {}
 
@@ -147,7 +150,7 @@ def listar_execucoes(pasta_resultados=configuracao.PASTA_RESULTADOS_GERAL):
 def _especificidade_na_sensibilidade(
     classes,
     probabilidades,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+    sensibilidade_desejada=None
 ):
     """
     Especificidade e limiar no ponto da curva ROC com sensibilidade de
@@ -155,6 +158,9 @@ def _especificidade_na_sensibilidade(
     (`metricas.ponto_na_sensibilidade`, a mesma regra da avaliação).
     Sem ponto que atinja a sensibilidade, (NaN, NaN).
     """
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
 
     limiar, _, especificidade = regras.ponto_na_sensibilidade(
         classes,
@@ -285,12 +291,15 @@ def _caracteristicas_paciente(tabela):
     return caracteristicas, agrupado["target"].max()
 
 
-def _fora_da_dobra(caracteristicas, classes, ajustar, seed=configuracao.SEED_SPLIT):
+def _fora_da_dobra(caracteristicas, classes, ajustar, seed=None):
     """
     Predições de cada paciente feitas por um ajuste que não o viu:
     validação cruzada estratificada em NUMERO_DOBRAS dobras de pacientes.
     `ajustar(x_treino, y_treino, x_teste)` devolve as predições do teste.
     """
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
 
     predicoes = np.zeros(len(classes))
 
