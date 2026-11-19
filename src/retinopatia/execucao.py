@@ -203,8 +203,8 @@ def _copiar_log(caminho, pasta_destino):
 def treinar_em_paralelo(
     execucoes,
     simultaneos=None,
-    fumaca=configuracao.FUMACA,
-    intervalo_minutos=configuracao.INTERVALO_ACOMPANHAMENTO_MIN
+    fumaca=None,
+    intervalo_minutos=None
 ):
     """
     Roda cada (experimento, semente) de `execucoes` num processo próprio,
@@ -214,6 +214,12 @@ def treinar_em_paralelo(
     Retorna:
         {(experimento, semente): código de saída}, 0 = concluído
     """
+
+    if fumaca is None:
+        fumaca = configuracao.FUMACA
+
+    if intervalo_minutos is None:
+        intervalo_minutos = configuracao.INTERVALO_ACOMPANHAMENTO_MIN
 
     execucoes = [tuple(execucao) for execucao in execucoes]
 
@@ -380,7 +386,7 @@ def executar_experimento():
             "O Drive não está montado: monte-o no notebook antes de lançar os treinos."
         )
 
-    utilitarios.configurar_sementes(configuracao.SEED)
+    utilitarios.configurar_sementes(configuracao.SEED_TREINO)
     utilitarios.configurar_precisao_mista()
 
     pastas = [(configuracao.PASTA_IMAGENS_OTIMIZADAS, configuracao.CAMINHOS_ZIP_CACHE)]
