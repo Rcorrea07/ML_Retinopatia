@@ -421,6 +421,53 @@ QUALIDADE_MINIMA_DEEPDRID = 1
 # treino; acima dela a execução para, como no EyePACS
 FRACAO_MAXIMA_FALHAS_EXTERNOS = 0.01
 
+# ============================================================
+# VALIDAÇÃO EXTERNA (nunca no treino)
+# ============================================================
+
+# Bases que só medem o modelo final (docs/DATASETS.md). Não são opções
+# de DATASETS_EXTERNOS: um experimento que as pusesse no treino para na
+# importação, pela checagem acima.
+VALIDACAO_EXTERNA = ["Messidor2"]
+
+# Messidor-2: 874 exames com os dois olhos. As fotos vêm da ADCIS (zip
+# em 4 partes, com todas as fotos em IMAGES/, e a lista de pares
+# esquerdo;direito) e os graus de consenso, do Google (Kaggle
+# google-brain/messidor2-dr-grades), na pasta Datasets.
+PASTA_MESSIDOR2 = os.path.join(PASTA_DATASETS, "Messidor-2")
+
+PRIMEIRA_PARTE_MESSIDOR2 = os.path.join(PASTA_MESSIDOR2, "IMAGES.zip.001")
+
+CAMINHO_PARES_MESSIDOR2 = os.path.join(PASTA_MESSIDOR2, "messidor-2.csv")
+
+PASTA_ROTULOS_MESSIDOR2 = os.path.join(PASTA_DATASETS, "Messidor2_rotulos")
+
+# Fotos originais extraídas, apagadas depois de processadas
+PASTA_VALIDACAO_EXTERNA_BRUTOS = "/content/validacao_externa"
+
+# Pastas, caches e listas de suspeitas, no padrão dos datasets externos
+PASTAS_IMAGENS_VALIDACAO_EXTERNA = {
+    nome: f"{PASTA_IMAGENS_OTIMIZADAS}_{nome.lower()}"
+    for nome in VALIDACAO_EXTERNA
+}
+
+CAMINHOS_ZIP_CACHE_VALIDACAO_EXTERNA = {
+    nome: [
+        os.path.join(pasta_cache, os.path.basename(pasta) + ".zip")
+        for pasta_cache in (PASTA_CACHE_COMPARTILHADA, PASTA_CACHE_DRIVE)
+    ]
+    for nome, pasta in PASTAS_IMAGENS_VALIDACAO_EXTERNA.items()
+}
+
+CAMINHOS_LISTA_SUSPEITAS_VALIDACAO_EXTERNA = {
+    nome: os.path.join(
+        _PASTA_LISTAS,
+        f"mascaras_suspeitas_{VERSAO_PRE_PROCESSAMENTO}{_SUFIXO_TAMANHO}"
+        f"_{nome.lower()}.csv"
+    )
+    for nome in VALIDACAO_EXTERNA
+}
+
 # Sufixo dos nomes de experimento e de modelo quando os dados extras ou
 # os datasets externos são usados (os resultados não se misturam com os
 # treinos só com o train). A lista dos externos fica no configuracao.json.
@@ -776,6 +823,19 @@ CAMINHO_MODELO_ESCOLHIDO = _valor(
         "R12_b0_768_externos_B0_768_v3_extra_externos_ec4e460_20261102_1741.keras"
     )
 )
+
+# Execução do R09 (03/11/2026) com o modelo escolhido: as predições de
+# validação do EyePACS gravadas lá dão os limiares da validação externa,
+# sem prever a validação de novo
+PASTA_RESULTADOS_R09 = os.path.join(
+    PASTA_RESULTADOS_GERAL,
+    "R09_final_b0_768_EfficientNetB0_768_prev3_seed42_extra_657ff09_20261103_2020"
+)
+
+# Diferença aceita entre os limiares recalculados das predições do R09 e
+# os gravados no resumo dele: as predições foram salvas em CSV a partir
+# de float32, então só a precisão do float32 se perde
+TOLERANCIA_LIMIARES_R09 = 1e-6
 
 # Versões para o celular (TFLite) do modelo escolhido
 PASTA_TFLITE = os.path.join(

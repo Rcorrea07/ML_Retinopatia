@@ -140,6 +140,23 @@ EXPERIMENTOS = {
         "TAMANHO_IMAGEM": (768, 768),
         "DATASETS_EXTERNOS": ["DDR", "APTOS", "DeepDRiD", "IDRiD"],
     },
+
+    # --------------------------------------------------------
+    # Validação externa: sem treino. O modelo escolhido (R12 semente 42,
+    # CAMINHO_MODELO_ESCOLHIDO) medido uma vez no Messidor-2, com os
+    # limiares que a validação do EyePACS escolheu no R09 (TTA2), pelo
+    # notebook Validacao_Externa (validacao_externa.rodar_messidor2).
+    # Desfecho principal, fixado antes de rodar: por paciente, só os
+    # pacientes com os dois olhos graduáveis, qualquer retinopatia
+    # (graus 1 a 4), sensibilidade e especificidade nos limiares do
+    # EyePACS e ROC-AUC, com intervalos de 95% por bootstrap.
+    # --------------------------------------------------------
+
+    "V01_r12_messidor2": {
+        "BACKBONE": "EfficientNetB0",
+        "TAMANHO_IMAGEM": (768, 768),
+        "MODO_TTA": "tta2",
+    },
 }
 
 
