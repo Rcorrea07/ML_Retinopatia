@@ -39,9 +39,9 @@ AUTOTUNE = tf.data.AUTOTUNE
 
 
 def criar_aumento_dados(
-    parametros=configuracao.AUMENTO_DADOS,
-    cor_fundo=configuracao.COR_FUNDO,
-    seed=configuracao.SEED
+    parametros=None,
+    cor_fundo=None,
+    seed=None
 ):
     """
     Cria o bloco de data augmentation, colocado logo depois da entrada
@@ -52,6 +52,15 @@ def criar_aumento_dados(
     mista ativa, elas devolveriam float16, e a entrada da EfficientNet
     deve continuar na faixa de 0 a 255 com precisão total.
     """
+
+    if parametros is None:
+        parametros = configuracao.AUMENTO_DADOS
+
+    if cor_fundo is None:
+        cor_fundo = configuracao.COR_FUNDO
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
 
     camadas = [
         layers.RandomFlip(
@@ -149,11 +158,11 @@ def _caminhos(df, pasta_imagens, coluna_imagem="image", coluna_pasta="pasta_proc
 def criar_dataset(
     df,
     treino,
-    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    tamanho_imagem=configuracao.TAMANHO_IMAGEM,
-    tamanho_lote=configuracao.TAMANHO_LOTE,
-    seed=configuracao.SEED,
-    pares=configuracao.MODELO_PARES
+    pasta_imagens=None,
+    tamanho_imagem=None,
+    tamanho_lote=None,
+    seed=None,
+    pares=None
 ):
     """
     Cria o tf.data.Dataset de um conjunto.
@@ -165,6 +174,21 @@ def criar_dataset(
     Com `pares=True`, cada exemplo traz também a imagem do outro olho
     do paciente.
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if tamanho_imagem is None:
+        tamanho_imagem = configuracao.TAMANHO_IMAGEM
+
+    if tamanho_lote is None:
+        tamanho_lote = configuracao.TAMANHO_LOTE
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
+
+    if pares is None:
+        pares = configuracao.MODELO_PARES
 
     formato = tuple(tamanho_imagem) + (3,)
 
@@ -235,10 +259,10 @@ def criar_geradores(
     df_treino,
     df_val,
     df_teste,
-    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    tamanho_imagem=configuracao.TAMANHO_IMAGEM,
-    tamanho_lote=configuracao.TAMANHO_LOTE,
-    seed=configuracao.SEED
+    pasta_imagens=None,
+    tamanho_imagem=None,
+    tamanho_lote=None,
+    seed=None
 ):
     """
     Cria os pipelines de treino (embaralhado), validação e teste (sem
@@ -247,6 +271,18 @@ def criar_geradores(
     Retorna:
         (treino_data, val_data, teste_data)
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if tamanho_imagem is None:
+        tamanho_imagem = configuracao.TAMANHO_IMAGEM
+
+    if tamanho_lote is None:
+        tamanho_lote = configuracao.TAMANHO_LOTE
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
 
     parametros = {
         "pasta_imagens": pasta_imagens,
