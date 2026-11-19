@@ -122,17 +122,21 @@ class MedidaDaAvaliacao(unittest.TestCase):
             })
 
     def test_medir_nao_importa_tensorflow(self):
+        # Carrega este arquivo pelo caminho: no Colab, o nome `tests` é de
+        # outro pacote instalado
         comando = (
+            "import importlib.util\n"
             "import sys\n"
             "import matplotlib\n"
             "matplotlib.use('Agg')\n"
-            "sys.path.insert(0, %r)\n"
-            "from tests.test_avaliacao import conjunto_sintetico\n"
+            f"especificacao = importlib.util.spec_from_file_location('dados', {str(Path(__file__).resolve())!r})\n"
+            "dados = importlib.util.module_from_spec(especificacao)\n"
+            "especificacao.loader.exec_module(dados)\n"
             "from retinopatia import avaliacao\n"
-            "df, variantes = conjunto_sintetico()\n"
+            "df, variantes = dados.conjunto_sintetico()\n"
             "avaliacao.medir_predicoes(df, variantes, 'tta2')\n"
             "print('tensorflow' in sys.modules)\n"
-        ) % str(PASTA_SRC.parent)
+        )
 
         resultado = subprocess.run(
             [sys.executable, "-c", comando],
