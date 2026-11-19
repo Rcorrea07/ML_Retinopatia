@@ -30,13 +30,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.metrics import (
-    average_precision_score,
-    cohen_kappa_score,
-    roc_auc_score
-)
+from sklearn.metrics import roc_auc_score
 
-from . import avaliacao, configuracao, pipeline_dados, pre_processamento
+from . import avaliacao, configuracao, metricas, pipeline_dados, pre_processamento
 from .modelo import GeM
 
 
@@ -102,22 +98,6 @@ def preparar_dados_v2(
     )
 
     return val_data, teste_data
-
-
-def _metricas(classes, probabilidades, limiar):
-    """
-    ROC-AUC, PR-AUC, sensibilidade e especificidade no limiar.
-    """
-
-    classes = np.asarray(classes)
-    preditas = np.asarray(probabilidades) >= limiar
-
-    return {
-        "roc_auc": roc_auc_score(classes, probabilidades),
-        "pr_auc": average_precision_score(classes, probabilidades),
-        "sensibilidade": preditas[classes == 1].mean(),
-        "especificidade": 1 - preditas[classes == 0].mean()
-    }
 
 
 def _titulo(texto):
@@ -200,7 +180,7 @@ def avaliar_referenciavel(
 
         for nome, (classes, probabilidades) in conjuntos.items():
             linhas[(nivel, nome)] = {
-                **_metricas(classes, probabilidades, limiar),
+                **metricas.metricas_no_limiar(classes, probabilidades, limiar),
                 "limiar": limiar
             }
 
@@ -252,16 +232,9 @@ def comparar_cabeca_grau(tabela_val):
 
     print(pd.DataFrame(linhas).T.round(4).to_string())
 
-    grau_arredondado = np.clip(
-        np.rint(tabela_val["grau_previsto"]),
-        0,
-        4
-    ).astype(int)
-
-    kappa = cohen_kappa_score(
+    kappa = metricas.kappa_grau(
         tabela_val["level_original"],
-        grau_arredondado,
-        weights="quadratic"
+        tabela_val["grau_previsto"]
     )
 
     erro_medio = np.abs(
@@ -302,7 +275,7 @@ def comparar_agregacao_paciente(
             sensibilidade_desejada
         )
 
-        linhas[funcao] = _metricas(classes, probabilidades, limiar)
+        linhas[funcao] = metricas.metricas_no_limiar(classes, probabilidades, limiar)
 
     resultado = pd.DataFrame(linhas).T
 
@@ -335,72 +308,13 @@ def intervalo_bootstrap(
         f"({numero_reamostragens} reamostragens de pacientes)"
     )
 
-    por_paciente = tabela.groupby("patient_id").agg(
-        target=("target", "max"),
-        prob_doente=("prob_doente", "max")
+    resultado = metricas.intervalos_bootstrap(
+        tabela,
+        limiar_olho,
+        limiar_paciente,
+        numero_reamostragens,
+        seed
     )
-
-    linhas_por_paciente = tabela.groupby("patient_id").indices
-
-    indices_olhos = [
-        linhas_por_paciente[paciente]
-        for paciente in por_paciente.index
-    ]
-
-    classes_olho = tabela["target"].astype(int).values
-    probs_olho = tabela["prob_doente"].values
-    classes_paciente = por_paciente["target"].astype(int).values
-    probs_paciente = por_paciente["prob_doente"].values
-
-    gerador = np.random.default_rng(seed)
-    numero_pacientes = len(por_paciente)
-
-    amostras = {"olho": [], "paciente": []}
-
-    for _ in range(numero_reamostragens):
-        pacientes = gerador.integers(0, numero_pacientes, numero_pacientes)
-
-        olhos = np.concatenate([indices_olhos[i] for i in pacientes])
-
-        amostras["olho"].append(
-            _metricas(classes_olho[olhos], probs_olho[olhos], limiar_olho)
-        )
-
-        amostras["paciente"].append(
-            _metricas(
-                classes_paciente[pacientes],
-                probs_paciente[pacientes],
-                limiar_paciente
-            )
-        )
-
-    estimativas = {
-        "olho": _metricas(classes_olho, probs_olho, limiar_olho),
-        "paciente": _metricas(
-            classes_paciente,
-            probs_paciente,
-            limiar_paciente
-        )
-    }
-
-    linhas = {}
-
-    for nivel, lista in amostras.items():
-        reamostradas = pd.DataFrame(lista)
-
-        for metrica in reamostradas.columns:
-            inferior, superior = np.percentile(
-                reamostradas[metrica],
-                [2.5, 97.5]
-            )
-
-            linhas[(nivel, metrica)] = {
-                "estimativa": estimativas[nivel][metrica],
-                "ic95_inferior": inferior,
-                "ic95_superior": superior
-            }
-
-    resultado = pd.DataFrame(linhas).T
 
     print(resultado.round(4).to_string())
 
