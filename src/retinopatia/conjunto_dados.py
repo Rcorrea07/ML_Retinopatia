@@ -23,11 +23,14 @@ from sklearn.model_selection import StratifiedGroupKFold
 from . import configuracao
 
 
-def carregar_csv(caminho_csv=configuracao.CAMINHO_CSV):
+def carregar_csv(caminho_csv=None):
     """
     Lê o CSV de rótulos, acrescenta a extensão .jpeg aos nomes das
     imagens e valida o padrão dos nomes.
     """
+
+    if caminho_csv is None:
+        caminho_csv = configuracao.CAMINHO_CSV
 
     dados = pd.read_csv(caminho_csv)
 
@@ -147,10 +150,10 @@ def extrair_identificador_paciente(dados):
 
 def dividir_treino_validacao_teste(
     dados,
-    seed=configuracao.SEED_SPLIT,
-    numero_splits=configuracao.NUMERO_SPLITS,
-    dobra_teste=configuracao.DOBRA_TESTE,
-    dobra_validacao=configuracao.DOBRA_VALIDACAO
+    seed=None,
+    numero_splits=None,
+    dobra_teste=None,
+    dobra_validacao=None
 ):
     """
     Divide os dados em treino, validação e teste mantendo os dois olhos
@@ -160,6 +163,18 @@ def dividir_treino_validacao_teste(
     Uma dobra do StratifiedGroupKFold vira teste, outra vira validação
     e as demais formam o treino.
     """
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
+
+    if numero_splits is None:
+        numero_splits = configuracao.NUMERO_SPLITS
+
+    if dobra_teste is None:
+        dobra_teste = configuracao.DOBRA_TESTE
+
+    if dobra_validacao is None:
+        dobra_validacao = configuracao.DOBRA_VALIDACAO
 
     divisor = StratifiedGroupKFold(
         n_splits=numero_splits,
@@ -225,14 +240,23 @@ def verificar_pacientes_disjuntos(df_treino, df_val, df_teste):
 
 
 def _caminhos_splits(
-    pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED_SPLIT,
-    versao=configuracao.VERSAO_SPLIT
+    pasta_splits=None,
+    seed=None,
+    versao=None
 ):
     """
     Monta os caminhos dos CSVs de split, versionados pelo esquema de
     divisão e pela semente.
     """
+
+    if pasta_splits is None:
+        pasta_splits = configuracao.PASTA_SPLITS
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
+
+    if versao is None:
+        versao = configuracao.VERSAO_SPLIT
 
     return {
         nome: os.path.join(
@@ -247,13 +271,19 @@ def salvar_splits(
     df_treino,
     df_val,
     df_teste,
-    pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED_SPLIT
+    pasta_splits=None,
+    seed=None
 ):
     """
     Salva os conjuntos no Google Drive, permitindo reproduzir a mesma
     divisão em outras sessões.
     """
+
+    if pasta_splits is None:
+        pasta_splits = configuracao.PASTA_SPLITS
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
 
     # Cria a pasta caso ainda não exista
     os.makedirs(
@@ -279,8 +309,8 @@ def salvar_splits(
 
 def carregar_splits(
     dados,
-    pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED_SPLIT
+    pasta_splits=None,
+    seed=None
 ):
     """
     Carrega os splits salvos anteriormente, se os três existirem.
@@ -289,6 +319,12 @@ def carregar_splits(
     estiver faltando. Interrompe com erro se os splits não baterem com
     o CSV atual (imagens desconhecidas ou pacientes repetidos).
     """
+
+    if pasta_splits is None:
+        pasta_splits = configuracao.PASTA_SPLITS
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
 
     caminhos = _caminhos_splits(pasta_splits, seed)
 
@@ -379,9 +415,9 @@ def _mostrar_distribuicao(df, coluna):
 
 
 def preparar_dataset(
-    caminho_csv=configuracao.CAMINHO_CSV,
-    pasta_splits=configuracao.PASTA_SPLITS,
-    seed=configuracao.SEED_SPLIT
+    caminho_csv=None,
+    pasta_splits=None,
+    seed=None
 ):
     """
     Executa o preparo completo dos dados: leitura do CSV, criação da
@@ -394,6 +430,15 @@ def preparar_dataset(
     Retorna:
         (dados, df_treino, df_val, df_teste)
     """
+
+    if caminho_csv is None:
+        caminho_csv = configuracao.CAMINHO_CSV
+
+    if pasta_splits is None:
+        pasta_splits = configuracao.PASTA_SPLITS
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
 
     dados = carregar_csv(caminho_csv)
     dados = criar_classe_binaria(dados)
@@ -448,9 +493,9 @@ def preparar_dataset(
 
 def carregar_dados_extra(
     dados,
-    caminho_rotulos=configuracao.CAMINHO_ROTULOS_EXTRA,
-    url_rotulos=configuracao.URL_ROTULOS_EXTRA,
-    pasta_processada=configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA
+    caminho_rotulos=None,
+    url_rotulos=None,
+    pasta_processada=None
 ):
     """
     Carrega os rótulos das 53.576 imagens do "test" da competição de
@@ -465,6 +510,15 @@ def carregar_dados_extra(
     `pasta_processada` apontando para a pasta das imagens extras e a
     `origem` "EyePACS_extra".
     """
+
+    if caminho_rotulos is None:
+        caminho_rotulos = configuracao.CAMINHO_ROTULOS_EXTRA
+
+    if url_rotulos is None:
+        url_rotulos = configuracao.URL_ROTULOS_EXTRA
+
+    if pasta_processada is None:
+        pasta_processada = configuracao.PASTA_IMAGENS_OTIMIZADAS_EXTRA
 
     if not os.path.isfile(caminho_rotulos):
         print(f"Baixando os rótulos do test de 2015 de {url_rotulos}...")
@@ -512,7 +566,7 @@ def carregar_dados_extra(
 def ampliar_treino(
     df_treino,
     df_adicionais,
-    pasta_processada=configuracao.PASTA_IMAGENS_OTIMIZADAS
+    pasta_processada=None
 ):
     """
     Junta ao treino as imagens que só entram nele (extras de 2015 e
@@ -521,6 +575,9 @@ def ampliar_treino(
     `pasta_processada` a pasta da sua imagem, que o pipeline de dados usa
     para montar o caminho, e em `origem` de onde ela veio.
     """
+
+    if pasta_processada is None:
+        pasta_processada = configuracao.PASTA_IMAGENS_OTIMIZADAS
 
     treino = df_treino.copy()
     treino["pasta_processada"] = pasta_processada
@@ -600,8 +657,8 @@ def reduzir_para_fumaca(
     df_val,
     df_teste,
     pacientes_por_classe=40,
-    ativo=configuracao.FUMACA,
-    seed=configuracao.SEED_SPLIT
+    ativo=None,
+    seed=None
 ):
     """
     Na execução de fumaça (`configuracao.FUMACA`), reduz cada conjunto a
@@ -612,6 +669,12 @@ def reduzir_para_fumaca(
     Retorna:
         (df_treino, df_val, df_teste)
     """
+
+    if ativo is None:
+        ativo = configuracao.FUMACA
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
 
     if not ativo:
         return df_treino, df_val, df_teste
