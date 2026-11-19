@@ -31,10 +31,9 @@ from . import (
     ambiente_colab,
     avaliacao,
     configuracao,
-    conjunto_dados,
     diagnostico,
+    execucao,
     pipeline_dados,
-    pre_processamento,
     utilitarios,
 )
 from .modelo import carregar_modelo_salvo, construir_modelo_inferencia
@@ -73,14 +72,8 @@ def preparar_imagens_avaliacao(incluir_teste=True):
 
     os.makedirs(configuracao.PASTA_RESULTADOS, exist_ok=True)
 
-    cache_restaurado = ambiente_colab.restaurar_cache_imagens()
-
-    ambiente_colab.extrair_dataset(somente_rotulos=cache_restaurado)
-
-    _, _, df_val, df_teste = conjunto_dados.preparar_dataset()
-
-    pre_processamento.pre_processar_dataset(
-        pd.concat([df_val, df_teste]) if incluir_teste else df_val,
+    _, _, df_val, df_teste, _ = execucao.preparar_imagens_eyepacs(
+        "avaliacao" if incluir_teste else "validacao",
         caminho_lista_suspeitas=os.path.join(
             configuracao.PASTA_RESULTADOS,
             "mascaras_suspeitas_validacao_teste.csv"
