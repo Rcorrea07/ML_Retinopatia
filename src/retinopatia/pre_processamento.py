@@ -43,11 +43,15 @@ from tqdm import tqdm
 
 from . import configuracao
 
+# Padrão de parâmetro em que None já tem significado (por exemplo, "não
+# gravar a lista de suspeitas"): o valor da configuração é lido na hora
+_PADRAO = object()
+
 
 def criar_mascara_retina(
     img,
-    metodo_mascara=configuracao.METODO_MASCARA,
-    limiar=configuracao.LIMIAR_MASCARA
+    metodo_mascara=None,
+    limiar=None
 ):
     """
     Cria a máscara binária (0 ou 255) da retina.
@@ -59,6 +63,12 @@ def criar_mascara_retina(
     plausível; nesses casos a máscara volta a ser a de Otsu. Com "otsu",
     reproduz a máscara da v2.
     """
+
+    if metodo_mascara is None:
+        metodo_mascara = configuracao.METODO_MASCARA
+
+    if limiar is None:
+        limiar = configuracao.LIMIAR_MASCARA
 
     if metodo_mascara not in ("limiar_fixo", "otsu"):
         raise ValueError(
@@ -256,7 +266,7 @@ def fracao_mascara(mascara_quadrada, area_foto_quadrada):
     return coberta.sum() / max(esperada.sum(), 1)
 
 
-def normalizar_cor_ben(img, sigma=configuracao.SIGMA_BEN):
+def normalizar_cor_ben(img, sigma=None):
     """
     Normalização de cor de Ben Graham: subtrai a cor média local
     (desfoque gaussiano) e centraliza em 128.
@@ -264,6 +274,9 @@ def normalizar_cor_ben(img, sigma=configuracao.SIGMA_BEN):
     Remove variações de iluminação e de câmera e realça estruturas
     pequenas como microaneurismas e exsudatos.
     """
+
+    if sigma is None:
+        sigma = configuracao.SIGMA_BEN
 
     desfocada = cv2.GaussianBlur(
         img,
@@ -281,9 +294,9 @@ def normalizar_cor_ben(img, sigma=configuracao.SIGMA_BEN):
 def normalizar_cor_ben_na_retina(
     img,
     mascara,
-    sigma=configuracao.SIGMA_BEN,
-    erosao=configuracao.EROSAO_MASCARA,
-    cor_fundo=configuracao.COR_FUNDO
+    sigma=None,
+    erosao=None,
+    cor_fundo=None
 ):
     """
     Normalização de Ben Graham calculada só dentro da retina.
@@ -293,6 +306,15 @@ def normalizar_cor_ben_na_retina(
     da retina não entra na conta e não aparecem faixas na fronteira.
     Fora da retina (já com a erosão), a imagem recebe `cor_fundo`.
     """
+
+    if sigma is None:
+        sigma = configuracao.SIGMA_BEN
+
+    if erosao is None:
+        erosao = configuracao.EROSAO_MASCARA
+
+    if cor_fundo is None:
+        cor_fundo = configuracao.COR_FUNDO
 
     retina = (mascara > 0).astype(np.uint8)
 
@@ -337,14 +359,20 @@ def normalizar_cor_ben_na_retina(
 
 def aplicar_mascara_circular(
     img,
-    fracao_raio=configuracao.RAIO_MASCARA,
-    cor_fundo=configuracao.COR_FUNDO
+    fracao_raio=None,
+    cor_fundo=None
 ):
     """
     Mantém apenas o disco central da imagem (já centralizada na retina)
     e pinta o restante com a cor de fundo, descartando a borda do
     círculo, onde ficam os artefatos de iluminação.
     """
+
+    if fracao_raio is None:
+        fracao_raio = configuracao.RAIO_MASCARA
+
+    if cor_fundo is None:
+        cor_fundo = configuracao.COR_FUNDO
 
     altura, largura = img.shape[:2]
 
@@ -369,10 +397,10 @@ def aplicar_mascara_circular(
 
 def processar_retina(
     img,
-    tamanho_imagem=configuracao.TAMANHO_IMAGEM,
-    aplicar_ben=configuracao.APLICAR_BEN,
-    metodo_mascara=configuracao.METODO_MASCARA,
-    ben_respeita_mascara=configuracao.BEN_RESPEITA_MASCARA
+    tamanho_imagem=None,
+    aplicar_ben=None,
+    metodo_mascara=None,
+    ben_respeita_mascara=None
 ):
     """
     Pré-processamento completo de uma foto de fundo de olho:
@@ -391,6 +419,18 @@ def processar_retina(
 
     Nos dois últimos casos a imagem devolvida é None.
     """
+
+    if tamanho_imagem is None:
+        tamanho_imagem = configuracao.TAMANHO_IMAGEM
+
+    if aplicar_ben is None:
+        aplicar_ben = configuracao.APLICAR_BEN
+
+    if metodo_mascara is None:
+        metodo_mascara = configuracao.METODO_MASCARA
+
+    if ben_respeita_mascara is None:
+        ben_respeita_mascara = configuracao.BEN_RESPEITA_MASCARA
 
     mascara = criar_mascara_retina(img, metodo_mascara)
 
@@ -423,9 +463,9 @@ def processar_retina(
 def pre_visualizar_recorte(
     dados,
     imagens=None,
-    pasta_imagens=configuracao.PASTA_IMAGENS,
-    numero_amostras=configuracao.NUMERO_AMOSTRAS_INSPECAO,
-    seed=configuracao.SEED
+    pasta_imagens=None,
+    numero_amostras=None,
+    seed=None
 ):
     """
     Inspeção visual: mostra a foto original, a máscara da retina e a
@@ -439,6 +479,15 @@ def pre_visualizar_recorte(
     cache no Drive, o dataset bruto não foi extraído e a inspeção é
     pulada.
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS
+
+    if numero_amostras is None:
+        numero_amostras = configuracao.NUMERO_AMOSTRAS_INSPECAO
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
 
     if not os.path.isdir(pasta_imagens):
         print(
@@ -504,7 +553,7 @@ def processar_e_salvar_imagem(
     pasta_imagens,
     pasta_saida,
     tamanho_imagem,
-    qualidade_jpeg=configuracao.QUALIDADE_JPEG,
+    qualidade_jpeg=None,
     nome_entrada=None,
     **opcoes_processamento
 ):
@@ -517,6 +566,9 @@ def processar_e_salvar_imagem(
     Retorna:
         (nome_da_imagem, status_do_processamento)
     """
+
+    if qualidade_jpeg is None:
+        qualidade_jpeg = configuracao.QUALIDADE_JPEG
 
     caminho_in = os.path.join(
         pasta_imagens,
@@ -565,11 +617,11 @@ def processar_e_salvar_imagem(
 
 def pre_processar_dataset(
     dados,
-    pasta_imagens=configuracao.PASTA_IMAGENS,
-    pasta_saida=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    tamanho_imagem=configuracao.TAMANHO_IMAGEM,
-    maximo_workers=configuracao.MAXIMO_WORKERS,
-    caminho_lista_suspeitas=configuracao.CAMINHO_LISTA_SUSPEITAS,
+    pasta_imagens=None,
+    pasta_saida=None,
+    tamanho_imagem=None,
+    maximo_workers=None,
+    caminho_lista_suspeitas=_PADRAO,
     coluna_entrada=None,
     fracao_maxima_falhas=0.0,
     **opcoes_processamento
@@ -591,6 +643,21 @@ def pre_processar_dataset(
 
     Retorna o DataFrame com o status de cada imagem.
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS
+
+    if pasta_saida is None:
+        pasta_saida = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if tamanho_imagem is None:
+        tamanho_imagem = configuracao.TAMANHO_IMAGEM
+
+    if maximo_workers is None:
+        maximo_workers = configuracao.MAXIMO_WORKERS
+
+    if caminho_lista_suspeitas is _PADRAO:
+        caminho_lista_suspeitas = configuracao.CAMINHO_LISTA_SUSPEITAS
 
     os.makedirs(
         pasta_saida,
