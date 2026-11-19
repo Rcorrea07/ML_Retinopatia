@@ -14,14 +14,20 @@ from . import configuracao
 
 
 def configurar_sementes(
-    seed=configuracao.SEED,
-    deterministico=configuracao.OPERACOES_DETERMINISTICAS
+    seed=None,
+    deterministico=None
 ):
     """
     Configura as sementes do Python, NumPy e TensorFlow e, se
     `deterministico`, tenta ativar operações determinísticas,
     garantindo a reprodutibilidade da pesquisa.
     """
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
+
+    if deterministico is None:
+        deterministico = configuracao.OPERACOES_DETERMINISTICAS
 
     # Mantém o valor da semente registrado no ambiente
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -64,7 +70,7 @@ def _ativar_determinismo():
         )
 
 
-def configurar_precisao_mista(ativa=configuracao.PRECISAO_MISTA):
+def configurar_precisao_mista(ativa=None):
     """
     Ativa a precisão mista (cálculos em float16, pesos em float32).
 
@@ -72,6 +78,9 @@ def configurar_precisao_mista(ativa=configuracao.PRECISAO_MISTA):
     para as camadas criadas depois dela. As saídas do modelo são
     criadas explicitamente em float32 para manter a perda estável.
     """
+
+    if ativa is None:
+        ativa = configuracao.PRECISAO_MISTA
 
     politica = "mixed_float16" if ativa else "float32"
 
@@ -126,7 +135,7 @@ def _descrever_ambiente():
 
 
 def salvar_configuracao(
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_resultados=None
 ):
     """
     Registra na pasta do experimento tudo o que é preciso para saber
@@ -137,6 +146,9 @@ def salvar_configuracao(
     - `codigo_src.zip`: uma cópia do pacote `retinopatia` como estava na
       execução, inclusive edições feitas sem commit.
     """
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS
 
     os.makedirs(
         pasta_resultados,
