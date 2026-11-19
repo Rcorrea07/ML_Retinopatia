@@ -1,5 +1,6 @@
 """
-Datasets de retinopatia além do EyePACS, só para o treino.
+Datasets de retinopatia além do EyePACS: os do treino e os da validação
+externa (Messidor-2, no fim do módulo; esses nunca entram no treino).
 
 DDR, APTOS 2019, DeepDRiD (fotos comuns, sem as de campo ultra-amplo) e
 IDRiD (parte B, de graduação) ficam na pasta Datasets do Drive, cada um
@@ -402,3 +403,202 @@ def manter_processadas(
         )
 
     return tabela[existe].reset_index(drop=True)
+
+
+# ============================================================
+# VALIDAÇÃO EXTERNA (nunca no treino)
+# ============================================================
+
+def _coluna(tabela, trecho):
+    """
+    A única coluna de `tabela` cujo nome contém `trecho` (sem diferença
+    de maiúsculas).
+    """
+
+    encontradas = [coluna for coluna in tabela.columns if trecho in str(coluna).lower()]
+
+    if len(encontradas) != 1:
+        raise ValueError(
+            f"Esperada uma coluna com '{trecho}' nos rótulos; "
+            f"encontradas: {encontradas} (colunas: {list(tabela.columns)})"
+        )
+
+    return encontradas[0]
+
+
+def _chave_foto(nome):
+    """
+    Nome da foto sem pasta, sem extensão e em minúsculas: os graus do
+    Google e a lista da ADCIS não escrevem as extensões do mesmo jeito.
+    """
+
+    return posixpath.splitext(posixpath.basename(str(nome).strip()))[0].lower()
+
+
+def tabela_messidor2(pares, rotulos):
+    """
+    Messidor-2 a partir de `pares` (o messidor-2.csv da ADCIS: colunas
+    left e right, uma linha por exame com as fotos dos dois olhos) e de
+    `rotulos` (os graus de consenso do Google: image_id,
+    adjudicated_dr_grade, adjudicated_dme, adjudicated_gradable).
+
+    Cada exame é um paciente (`messidor2_<linha>`). As fotos ficam em
+    IMAGES/ no zip da ADCIS. A execução para se uma foto aparece em dois
+    exames, se uma foto não tem grau ou se um grau não tem foto. As
+    fotos não graduáveis ficam na tabela com `gradavel` falso e sem grau
+    (a medida usa só as graduáveis).
+
+    Retorna:
+        DataFrame com image, membro, patient_id, olho, level_original,
+        target, gradavel e dme
+    """
+
+    pares = pares.rename(columns=lambda coluna: str(coluna).strip().lower())
+
+    fotos = pd.DataFrame([
+        {
+            "arquivo": str(arquivo).strip(),
+            "patient_id": f"messidor2_{indice:04d}",
+            "olho": olho
+        }
+        for indice, linha in enumerate(pares[["left", "right"]].itertuples(index=False))
+        for olho, arquivo in (("esquerdo", linha.left), ("direito", linha.right))
+    ])
+
+    fotos["chave"] = fotos["arquivo"].map(_chave_foto)
+
+    repetidas = fotos.loc[fotos["chave"].duplicated(), "arquivo"].tolist()
+
+    if repetidas:
+        raise ValueError(f"Fotos em mais de um exame do Messidor-2: {repetidas[:5]}")
+
+    graus = pd.DataFrame({
+        "chave": rotulos[_coluna(rotulos, "image")].map(_chave_foto),
+        "nivel": pd.to_numeric(rotulos[_coluna(rotulos, "dr_grade")], errors="coerce"),
+        "dme": pd.to_numeric(rotulos[_coluna(rotulos, "dme")], errors="coerce"),
+        "gradavel": pd.to_numeric(rotulos[_coluna(rotulos, "gradable")], errors="coerce") == 1
+    })
+
+    if graus["chave"].duplicated().any():
+        raise ValueError("Fotos repetidas nos graus do Messidor-2.")
+
+    sem_grau = sorted(set(fotos["chave"]) - set(graus["chave"]))
+    sem_foto = sorted(set(graus["chave"]) - set(fotos["chave"]))
+
+    if sem_grau or sem_foto:
+        raise ValueError(
+            f"Messidor-2: {len(sem_grau)} fotos sem grau ({sem_grau[:5]}) e "
+            f"{len(sem_foto)} graus sem foto ({sem_foto[:5]})."
+        )
+
+    tabela = fotos.merge(graus, on="chave", how="left", validate="one_to_one")
+
+    tabela["gradavel"] = tabela["gradavel"] & tabela["nivel"].isin(
+        configuracao.NIVEIS_PERMITIDOS
+    )
+
+    tabela["level_original"] = tabela["nivel"].where(tabela["gradavel"])
+    tabela["target"] = (tabela["level_original"] > 0).astype(float).where(tabela["gradavel"])
+
+    tabela["image"] = "messidor2_" + tabela["arquivo"].map(
+        lambda arquivo: posixpath.splitext(arquivo)[0]
+    ) + ".jpg"
+
+    tabela["membro"] = "IMAGES/" + tabela["arquivo"]
+
+    return tabela[
+        [
+            "image", "membro", "patient_id", "olho", "level_original",
+            "target", "gradavel", "dme"
+        ]
+    ]
+
+
+def _ler_rotulos_messidor2(pasta):
+    """
+    A tabela de graus do Google na pasta baixada do Kaggle: um CSV solto
+    ou dentro do zip que o download deixou como veio.
+    """
+
+    if not os.path.isdir(pasta):
+        raise FileNotFoundError(
+            f"Graus do Messidor-2 não encontrados em {pasta}. Baixe com o "
+            "notebook Baixar_Datasets (Kaggle google-brain/messidor2-dr-grades)."
+        )
+
+    candidatos = []
+
+    for arquivo in sorted(os.listdir(pasta)):
+        caminho = os.path.join(pasta, arquivo)
+
+        if arquivo.lower().endswith(".csv"):
+            candidatos.append((caminho, None))
+
+        elif arquivo.lower().endswith(".zip"):
+            with zipfile.ZipFile(caminho) as arquivo_zip:
+                candidatos += [
+                    (caminho, membro)
+                    for membro in arquivo_zip.namelist()
+                    if membro.lower().endswith(".csv")
+                ]
+
+    if len(candidatos) != 1:
+        raise ValueError(
+            f"Esperado um CSV de graus em {pasta}; encontrados: {candidatos}"
+        )
+
+    caminho, membro = candidatos[0]
+
+    if membro is None:
+        return pd.read_csv(caminho)
+
+    with zipfile.ZipFile(caminho) as arquivo_zip:
+        return _ler_tabela(arquivo_zip, membro)
+
+
+def carregar_messidor2(caminho_pares=None, pasta_rotulos=None):
+    """
+    Tabela do Messidor-2 (`tabela_messidor2`) lida do Drive, com a pasta
+    das imagens processadas e a `origem`. Só para a validação externa:
+    nunca entra no treino.
+    """
+
+    if caminho_pares is None:
+        caminho_pares = configuracao.CAMINHO_PARES_MESSIDOR2
+
+    if pasta_rotulos is None:
+        pasta_rotulos = configuracao.PASTA_ROTULOS_MESSIDOR2
+
+    if not os.path.isfile(caminho_pares):
+        raise FileNotFoundError(
+            f"Lista de pares do Messidor-2 não encontrada em {caminho_pares}. "
+            "Suba a pasta Messidor-2 (as 4 partes do zip e o messidor-2.csv) "
+            "para a pasta Datasets do Drive."
+        )
+
+    tabela = tabela_messidor2(
+        pd.read_csv(caminho_pares, sep=";"),
+        _ler_rotulos_messidor2(pasta_rotulos)
+    )
+
+    tabela["pasta_processada"] = configuracao.PASTAS_IMAGENS_VALIDACAO_EXTERNA["Messidor2"]
+    tabela["origem"] = "Messidor2"
+
+    graduaveis = tabela[tabela["gradavel"]]
+
+    print(
+        f"\nMessidor-2: {len(tabela)} fotos de {tabela['patient_id'].nunique()} "
+        f"pacientes; {len(graduaveis)} graduáveis "
+        f"({(graduaveis.groupby('patient_id').size() == 2).sum()} pacientes "
+        "com os dois olhos graduáveis). Só para a validação externa."
+    )
+
+    print(
+        graduaveis["level_original"]
+        .astype(int)
+        .value_counts()
+        .sort_index()
+        .to_string()
+    )
+
+    return tabela

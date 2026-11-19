@@ -199,6 +199,48 @@ class LeitoresDosDatasets(unittest.TestCase):
                     tabela, pasta, fracao_maxima=0.1
                 )
 
+    def test_messidor2_liga_pares_e_graus_sem_diferenca_de_maiusculas(self):
+        # Como no arquivo da ADCIS: espaço sobrando no cabeçalho e .JPG
+        pares = pd.DataFrame({
+            "left": ["20051020_43808_0100_PP.png", "IM000012.JPG"],
+            "right ": ["20051020_43832_0100_PP.png", "IM000013.JPG"]
+        })
+
+        rotulos = pd.DataFrame({
+            "image_id": [
+                "20051020_43808_0100_PP.png", "20051020_43832_0100_PP.png",
+                "IM000012.jpg", "IM000013.jpg"
+            ],
+            "adjudicated_dr_grade": [0, 2, 1, None],
+            "adjudicated_dme": [0, 1, 0, 0],
+            "adjudicated_gradable": [1, 1, 1, 0]
+        })
+
+        tabela = datasets_externos.tabela_messidor2(pares, rotulos)
+
+        self.assertEqual(
+            tabela["patient_id"].tolist(),
+            ["messidor2_0000"] * 2 + ["messidor2_0001"] * 2
+        )
+        self.assertEqual(tabela["olho"].tolist(), ["esquerdo", "direito"] * 2)
+        self.assertEqual(tabela["membro"].iloc[2], "IMAGES/IM000012.JPG")
+        self.assertEqual(tabela["image"].iloc[2], "messidor2_IM000012.jpg")
+        self.assertEqual(tabela["gradavel"].tolist(), [True, True, True, False])
+        self.assertEqual(tabela["target"].iloc[:3].tolist(), [0.0, 1.0, 1.0])
+        self.assertTrue(pd.isna(tabela["level_original"].iloc[3]))
+
+    def test_messidor2_foto_sem_grau_para_a_execucao(self):
+        pares = pd.DataFrame({"left": ["a.png"], "right": ["b.png"]})
+        rotulos = pd.DataFrame({
+            "image_id": ["a.png"],
+            "adjudicated_dr_grade": [0],
+            "adjudicated_dme": [0],
+            "adjudicated_gradable": [1]
+        })
+
+        with self.assertRaises(ValueError):
+            datasets_externos.tabela_messidor2(pares, rotulos)
+
 
 if __name__ == "__main__":
     unittest.main()
