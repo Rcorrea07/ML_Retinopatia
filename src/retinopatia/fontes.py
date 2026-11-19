@@ -164,6 +164,58 @@ def fontes_de_treino():
     return fontes
 
 
+def _extrair_messidor2(tabela):
+    """
+    Fotos do Messidor-2, do zip em 4 partes da ADCIS (todas em IMAGES/).
+    """
+
+    pasta_originais = os.path.join(configuracao.PASTA_VALIDACAO_EXTERNA_BRUTOS, "Messidor2")
+
+    ambiente_colab.extrair_7z(configuracao.PRIMEIRA_PARTE_MESSIDOR2, pasta_originais)
+
+    return pasta_originais
+
+
+def fonte_messidor2():
+    """
+    Messidor-2, só para a validação externa: 1.748 fotos de 874 exames
+    com os dois olhos, graus de consenso do Google.
+    """
+
+    return FonteDados(
+        nome="Messidor2",
+        papel="validacao_externa",
+        pasta_processada=configuracao.PASTAS_IMAGENS_VALIDACAO_EXTERNA["Messidor2"],
+        caminhos_zip_cache=tuple(configuracao.CAMINHOS_ZIP_CACHE_VALIDACAO_EXTERNA["Messidor2"]),
+        caminho_lista_suspeitas=configuracao.CAMINHOS_LISTA_SUSPEITAS_VALIDACAO_EXTERNA["Messidor2"],
+        ler_tabela=lambda dados: datasets_externos.carregar_messidor2(),
+        extrair=_extrair_messidor2,
+        coluna_entrada="membro",
+        fracao_maxima_falhas=configuracao.FRACAO_MAXIMA_FALHAS_EXTERNOS,
+        apagar_originais=True
+    )
+
+
+# Bases de validação externa por nome (`configuracao.VALIDACAO_EXTERNA`)
+FONTES_VALIDACAO_EXTERNA = {
+    "Messidor2": fonte_messidor2,
+}
+
+
+def fonte_validacao_externa(nome):
+    """
+    A ficha de uma base de validação externa.
+    """
+
+    if nome not in FONTES_VALIDACAO_EXTERNA:
+        raise ValueError(
+            f"Validação externa desconhecida: {nome}. "
+            f"Opções: {sorted(FONTES_VALIDACAO_EXTERNA)}"
+        )
+
+    return FONTES_VALIDACAO_EXTERNA[nome]()
+
+
 # ============================================================
 # O PREPARO
 # ============================================================

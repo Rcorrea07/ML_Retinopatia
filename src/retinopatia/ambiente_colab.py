@@ -190,6 +190,23 @@ def extrair_imagens(
     print(f"Imagens de '{nome}' extraídas em: {pasta_imagens}")
 
 
+def extrair_7z(primeira_parte, destino):
+    """
+    Extrai um zip em várias partes (`.001`, `.002`, ...) lendo-as em
+    sequência, direto do Drive, para `destino`. Pula se o destino já tem
+    arquivos.
+    """
+
+    if os.path.isdir(destino) and os.listdir(destino):
+        print(f"Já extraído em: {destino}")
+        return
+
+    os.makedirs(destino, exist_ok=True)
+
+    print(f"Extraindo {primeira_parte}...")
+    _executar(f'7z x -y -bd -o"{destino}" "{primeira_parte}" > /dev/null')
+
+
 def extrair_dataset(
     caminho_zip_principal=None,
     pasta_base=None,
