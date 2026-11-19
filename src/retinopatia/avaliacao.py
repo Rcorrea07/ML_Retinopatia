@@ -286,6 +286,28 @@ def tabela_predicoes(df, variantes, modo_tta):
     return tabela
 
 
+def variantes_da_tabela(tabela):
+    """
+    O inverso de `tabela_predicoes`: as predições por modo de TTA de uma
+    tabela salva (colunas `prob_doente_<modo>` e `grau_previsto_<modo>`),
+    no formato de `prever_variantes`.
+    """
+
+    variantes = {
+        modo: (
+            tabela[f"prob_doente_{modo}"].values,
+            tabela[f"grau_previsto_{modo}"].values
+        )
+        for modo in MODOS_TTA
+        if f"prob_doente_{modo}" in tabela
+    }
+
+    if not variantes:
+        raise ValueError("A tabela não tem predições por modo de TTA (prob_doente_<modo>).")
+
+    return variantes
+
+
 def _medir_nivel(classes, probabilidades, limiar, titulo):
     """
     ROC-AUC, PR-AUC, sensibilidade e especificidade no limiar e a matriz

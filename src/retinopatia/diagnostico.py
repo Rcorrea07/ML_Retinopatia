@@ -73,12 +73,14 @@ def avaliar_referenciavel(
     tabela_val,
     tabela_teste,
     grau_minimo=None,
-    sensibilidade_desejada=None
+    sensibilidade_desejada=None,
+    nome_medido="teste"
 ):
     """
     Desempenho das mesmas probabilidades para retinopatia referenciável
     (grau >= `grau_minimo`), por olho e por paciente. Os limiares desse
-    alvo são escolhidos na validação e medidos no teste.
+    alvo são escolhidos na validação e medidos em `tabela_teste` (o
+    teste, ou uma base de validação externa: `nome_medido`).
     """
 
     if grau_minimo is None:
@@ -94,7 +96,7 @@ def avaliar_referenciavel(
     for nivel in ("olho", "paciente"):
         conjuntos = {}
 
-        for nome, tabela in (("validação", tabela_val), ("teste", tabela_teste)):
+        for nome, tabela in (("validação", tabela_val), (nome_medido, tabela_teste)):
             tabela = tabela.assign(
                 target=(tabela["level_original"] >= grau_minimo).astype(int)
             )
