@@ -168,7 +168,7 @@ def tabela_aptos(arquivo_zip):
 
 def tabela_deepdrid(
     arquivo_zip,
-    qualidade_minima=configuracao.QUALIDADE_MINIMA_DEEPDRID
+    qualidade_minima=None
 ):
     """
     DeepDRiD (GitHub deepdrdoc), só as fotos comuns de fundo de olho
@@ -182,6 +182,9 @@ def tabela_deepdrid(
     qualidade em outra (Challenge2_labels). Ficam só as fotos com nota de
     qualidade de pelo menos `qualidade_minima` (ver configuracao).
     """
+
+    if qualidade_minima is None:
+        qualidade_minima = configuracao.QUALIDADE_MINIMA_DEEPDRID
 
     nomes = arquivo_zip.namelist()
     raiz = "regular_fundus_images/"
@@ -368,7 +371,7 @@ def carregar_dataset_externo(nome, caminho_zip=None):
 def manter_processadas(
     tabela,
     pasta_processada,
-    fracao_maxima=configuracao.FRACAO_MAXIMA_FALHAS_EXTERNOS
+    fracao_maxima=None
 ):
     """
     Só as linhas cuja imagem processada está em `pasta_processada`. As
@@ -376,6 +379,9 @@ def manter_processadas(
     forem mais que `fracao_maxima`, o cache está incompleto e a execução
     para.
     """
+
+    if fracao_maxima is None:
+        fracao_maxima = configuracao.FRACAO_MAXIMA_FALHAS_EXTERNOS
 
     existe = tabela["image"].map(
         lambda nome: os.path.isfile(os.path.join(pasta_processada, nome))
