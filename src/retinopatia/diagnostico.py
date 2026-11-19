@@ -36,11 +36,14 @@ from . import avaliacao, configuracao, metricas, pipeline_dados, pre_processamen
 from .modelo import GeM
 
 
-def carregar_modelo(caminho=configuracao.CAMINHO_MODELO_V2):
+def carregar_modelo(caminho=None):
     """
     Carrega um modelo salvo em `.keras` (só para predição, sem
     recompilar).
     """
+
+    if caminho is None:
+        caminho = configuracao.CAMINHO_MODELO_V2
 
     if not os.path.isfile(caminho):
         raise FileNotFoundError(
@@ -60,9 +63,9 @@ def carregar_modelo(caminho=configuracao.CAMINHO_MODELO_V2):
 def preparar_dados_v2(
     df_val,
     df_teste,
-    pasta_imagens_v2=configuracao.PASTA_IMAGENS_V2,
-    opcoes_v2=configuracao.OPCOES_PRE_PROCESSAMENTO_V2,
-    pasta_diagnostico=configuracao.PASTA_DIAGNOSTICO_V2
+    pasta_imagens_v2=None,
+    opcoes_v2=None,
+    pasta_diagnostico=None
 ):
     """
     Processa só as imagens de validação e teste com o pré-processamento
@@ -74,6 +77,15 @@ def preparar_dados_v2(
     Retorna:
         (val_data_v2, teste_data_v2)
     """
+
+    if pasta_imagens_v2 is None:
+        pasta_imagens_v2 = configuracao.PASTA_IMAGENS_V2
+
+    if opcoes_v2 is None:
+        opcoes_v2 = configuracao.OPCOES_PRE_PROCESSAMENTO_V2
+
+    if pasta_diagnostico is None:
+        pasta_diagnostico = configuracao.PASTA_DIAGNOSTICO_V2
 
     pre_processamento.pre_processar_dataset(
         pd.concat([df_val, df_teste]),
@@ -140,14 +152,20 @@ def relatorio_por_grau(tabela, limiar, nome="Teste"):
 def avaliar_referenciavel(
     tabela_val,
     tabela_teste,
-    grau_minimo=configuracao.GRAU_REFERENCIAVEL,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+    grau_minimo=None,
+    sensibilidade_desejada=None
 ):
     """
     Desempenho das mesmas probabilidades para retinopatia referenciável
     (grau >= `grau_minimo`), por olho e por paciente. Os limiares desse
     alvo são escolhidos na validação e medidos no teste.
     """
+
+    if grau_minimo is None:
+        grau_minimo = configuracao.GRAU_REFERENCIAVEL
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
 
     _titulo(f"Retinopatia referenciável (grau >= {grau_minimo})")
 
@@ -249,14 +267,20 @@ def comparar_cabeca_grau(tabela_val):
 
 def comparar_agregacao_paciente(
     tabela_val,
-    agregacoes=configuracao.AGREGACOES_PACIENTE,
-    sensibilidade_desejada=configuracao.SENSIBILIDADE_DESEJADA
+    agregacoes=None,
+    sensibilidade_desejada=None
 ):
     """
     Na validação: compara formas de combinar os dois olhos do paciente.
     A especificidade é a obtida no limiar que atinge a sensibilidade
     desejada (escolhido na própria validação, igual para todas).
     """
+
+    if agregacoes is None:
+        agregacoes = configuracao.AGREGACOES_PACIENTE
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
 
     _titulo("Agregação dos dois olhos por paciente (validação)")
 
@@ -294,14 +318,20 @@ def intervalo_bootstrap(
     limiar_olho,
     limiar_paciente,
     nome="Teste",
-    numero_reamostragens=configuracao.NUMERO_BOOTSTRAP,
-    seed=configuracao.SEED
+    numero_reamostragens=None,
+    seed=None
 ):
     """
     Intervalos de confiança de 95% por bootstrap, reamostrando pacientes
     (os dois olhos de um paciente entram ou saem juntos, porque não são
     independentes). Usa os limiares escolhidos na validação.
     """
+
+    if numero_reamostragens is None:
+        numero_reamostragens = configuracao.NUMERO_BOOTSTRAP
+
+    if seed is None:
+        seed = configuracao.SEED_TREINO
 
     _titulo(
         f"{nome} — intervalos de confiança de 95% "
@@ -324,9 +354,9 @@ def intervalo_bootstrap(
 def listar_falsos_negativos(
     tabela,
     limiar,
-    grau_minimo=configuracao.GRAU_REFERENCIAVEL,
-    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    numero_imagens=configuracao.NUMERO_IMAGENS_ERRO,
+    grau_minimo=None,
+    pasta_imagens=None,
+    numero_imagens=None,
     nome="Teste"
 ):
     """
@@ -334,6 +364,15 @@ def listar_falsos_negativos(
     no limiar por olho e mostra as imagens processadas (o que o modelo
     viu), das mais confiantes no erro para as menos.
     """
+
+    if grau_minimo is None:
+        grau_minimo = configuracao.GRAU_REFERENCIAVEL
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if numero_imagens is None:
+        numero_imagens = configuracao.NUMERO_IMAGENS_ERRO
 
     _titulo(
         f"{nome} — falsos negativos de grau >= {grau_minimo} "
@@ -394,8 +433,8 @@ def listar_falsos_negativos(
 def relatorio_completo(
     resultado_validacao,
     resultado_teste=None,
-    pasta_imagens=configuracao.PASTA_IMAGENS_OTIMIZADAS,
-    pasta_resultados=configuracao.PASTA_RESULTADOS
+    pasta_imagens=None,
+    pasta_resultados=None
 ):
     """
     Executa todo o diagnóstico a partir dos resultados de
@@ -410,6 +449,12 @@ def relatorio_completo(
     As tabelas também são gravadas em CSV na pasta do experimento.
     Retorna um dicionário com as tabelas de cada parte.
     """
+
+    if pasta_imagens is None:
+        pasta_imagens = configuracao.PASTA_IMAGENS_OTIMIZADAS
+
+    if pasta_resultados is None:
+        pasta_resultados = configuracao.PASTA_RESULTADOS
 
     tabela_val = resultado_validacao["tabela"]
 
