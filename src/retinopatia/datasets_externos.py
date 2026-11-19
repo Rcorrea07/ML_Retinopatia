@@ -13,7 +13,7 @@ processada (`image`, com o prefixo do dataset e sempre .jpg), o grau
 (`level`) e o paciente (`patient_id`, com o mesmo prefixo; quando o
 dataset não informa o paciente, cada foto é o seu). Daí em diante as
 fotos seguem o caminho das extras de 2015: o mesmo pré-processamento,
-uma pasta e um cache por dataset (`ambiente_colab.preparar_imagens_externas`)
+uma pasta e um cache por dataset (`fontes.fonte_externa`)
 e linhas acrescentadas ao treino com `pasta_processada` e `origem`.
 
 Os caminhos dentro dos zips foram conferidos nos arquivos baixados em

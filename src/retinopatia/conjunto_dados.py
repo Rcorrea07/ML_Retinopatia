@@ -570,7 +570,7 @@ def ampliar_treino(
 ):
     """
     Junta ao treino as imagens que só entram nele (extras de 2015 e
-    datasets externos, ver `ambiente_colab.preparar_dados_adicionais`).
+    datasets externos, ver `fontes.preparar_dados_adicionais`).
     A validação e o teste não mudam. Cada linha guarda em
     `pasta_processada` a pasta da sua imagem, que o pipeline de dados usa
     para montar o caminho, e em `origem` de onde ela veio.
