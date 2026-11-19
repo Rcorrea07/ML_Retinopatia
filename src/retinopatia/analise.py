@@ -30,15 +30,10 @@ import re
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    average_precision_score,
-    cohen_kappa_score,
-    roc_auc_score,
-    roc_curve
-)
+from sklearn.metrics import average_precision_score, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
-from . import configuracao
+from . import configuracao, metricas as regras
 
 # Modos de TTA que podem aparecer nas predições salvas
 MODOS = ["sem_tta", "tta2", "tta4"]
@@ -157,19 +152,20 @@ def _especificidade_na_sensibilidade(
     """
     Especificidade e limiar no ponto da curva ROC com sensibilidade de
     pelo menos `sensibilidade_desejada` e menor taxa de falsos positivos
-    (a mesma regra de `avaliacao.escolher_limiar`).
+    (`metricas.ponto_na_sensibilidade`, a mesma regra da avaliação).
+    Sem ponto que atinja a sensibilidade, (NaN, NaN).
     """
 
-    fpr, tpr, limiares = roc_curve(classes, probabilidades)
+    limiar, _, especificidade = regras.ponto_na_sensibilidade(
+        classes,
+        probabilidades,
+        sensibilidade_desejada
+    )
 
-    validos = np.where(tpr >= sensibilidade_desejada)[0]
-
-    if len(validos) == 0:
+    if limiar is None:
         return np.nan, np.nan
 
-    melhor = validos[np.argmin(fpr[validos])]
-
-    return 1 - fpr[melhor], limiares[melhor]
+    return especificidade, limiar
 
 
 def por_paciente(tabela, coluna="prob"):
@@ -178,10 +174,11 @@ def por_paciente(tabela, coluna="prob"):
     probabilidade entre os olhos.
     """
 
-    return tabela.groupby("patient_id").agg(
-        target=("target", "max"),
-        prob=(coluna, "max")
-    )
+    return regras.por_paciente(
+        tabela["patient_id"].values,
+        tabela["target"].values,
+        tabela[coluna].values
+    ).rename(columns={"valor": "prob"})
 
 
 def metricas(tabela, coluna="prob"):
@@ -220,13 +217,7 @@ def kappa_grau(tabela):
     teste da competição (outra amostra; serve de ordem de grandeza).
     """
 
-    previstos = np.clip(np.rint(tabela["grau"]), 0, 4).astype(int)
-
-    return cohen_kappa_score(
-        tabela["level_original"],
-        previstos,
-        weights="quadratic"
-    )
+    return regras.kappa_grau(tabela["level_original"], tabela["grau"])
 
 
 def tabela_comparativa(
@@ -509,6 +500,13 @@ def retrato_metricas(
     if pasta_saida is None:
         pasta_saida = os.path.join(configuracao.PASTA_RESULTADOS_GERAL, "regressao")
 
+    caminho = os.path.join(pasta_saida, f"{rotulo}_metricas.csv")
+
+    # O retrato "antes" é a referência: gravado uma vez, nunca refeito
+    if rotulo == "antes" and os.path.isfile(caminho):
+        print(f"O retrato 'antes' já existe e não é refeito: {caminho}")
+        return pd.read_csv(caminho, dtype={"item": str})
+
     linhas = []
 
     with contextlib.redirect_stdout(io.StringIO()):
@@ -607,7 +605,6 @@ def retrato_metricas(
 
     os.makedirs(pasta_saida, exist_ok=True)
 
-    caminho = os.path.join(pasta_saida, f"{rotulo}_metricas.csv")
     retrato.to_csv(caminho, index=False, float_format="%.17g")
 
     print(f"Retrato '{rotulo}': {len(retrato)} números de {len(execucoes)} execuções em {caminho}")
@@ -627,7 +624,7 @@ def conferir_regressao(
     até `tolerancia`; NaN só bate com NaN).
 
     Retorna as linhas que diferem (vazio quando a refatoração não mudou
-    nenhum número).
+    nenhum número), ou None se um dos dois retratos ainda não existe.
     """
 
     if pasta is None:
@@ -635,10 +632,15 @@ def conferir_regressao(
 
     chaves = ["execucao", "modo", "parte", "item", "metrica"]
 
-    tabelas = [
-        pd.read_csv(os.path.join(pasta, f"{rotulo}_metricas.csv"), dtype={"item": str})
-        for rotulo in (antes, depois)
-    ]
+    caminhos = [os.path.join(pasta, f"{rotulo}_metricas.csv") for rotulo in (antes, depois)]
+
+    faltando = [caminho for caminho in caminhos if not os.path.isfile(caminho)]
+
+    if faltando:
+        print(f"Ainda não há retrato para comparar: {', '.join(faltando)}")
+        return None
+
+    tabelas = [pd.read_csv(caminho, dtype={"item": str}) for caminho in caminhos]
 
     juntas = tabelas[0].merge(
         tabelas[1],
