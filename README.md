@@ -23,13 +23,14 @@ Colab por `git clone`/`git pull`.
    `src/retinopatia/experimentos.py`).
 3. Execute as células de cima para baixo.
 
-Um experimento por sessão. Para rodar vários em paralelo, use uma cópia do
-notebook por sessão, mudando só `EXPERIMENTO`. O passo a passo das rodadas, com a
+Um experimento por sessão, escolhido no formulário da primeira célula
+(experimento, semente, fumaça, teste e versão do código). Para vários treinos na
+mesma GPU, use `notebooks/Treinos_Paralelos.ipynb`. O passo a passo das rodadas, com a
 tabela de resultados, está em [`docs/PLANO_V4.md`](docs/PLANO_V4.md); as fontes, em
 [`docs/REFERENCIAS.md`](docs/REFERENCIAS.md).
 
 Os experimentos são comparados só na validação. O teste fica fechado até o modelo
-final (`RETINOPATIA_AVALIAR_TESTE = "1"` na primeira célula).
+final (`AVALIAR_TESTE` marcado no formulário da primeira célula).
 
 A primeira célula clona (ou atualiza) este repositório dentro do Colab e coloca
 `src/` no `sys.path`, tornando o pacote `retinopatia` importável. O `autoreload`
@@ -49,24 +50,32 @@ serve apenas como documentação das bibliotecas usadas no Colab.
 
 ```
 ├── docs/                       # plano v4, referências e planejamento anterior
-├── notebooks/
+├── notebooks/                  # um formulário na primeira célula de cada um
 │   ├── Retinopatia_0_1.ipynb   # treino: orquestra a execução no Colab
+│   ├── Treinos_Paralelos.ipynb # vários treinos na mesma GPU, numa sessão
+│   ├── Modelo_Final.ipynb      # teste único do modelo escolhido e TFLite
 │   ├── Preparar_Caches.ipynb   # caches de imagens (conta pessoal), uma vez por tamanho
-│   └── Analisar_Resultados.ipynb  # comparação das execuções salvas (só CPU)
-├── tests/                      # testes sem TensorFlow
+│   ├── Baixar_Datasets.ipynb   # datasets externos direto para o Drive (conta pessoal)
+│   └── Analisar_Resultados.ipynb  # comparação das execuções salvas e testes (só CPU)
+├── tests/                      # testes; os que pedem pandas rodam no Colab
 └── src/retinopatia/
     ├── experimentos.py         # experimentos nomeados (o que cada um muda)
     ├── configuracao.py         # sementes, caminhos e hiperparâmetros
     ├── utilitarios.py          # sementes, determinismo e precisão mista
-    ├── ambiente_colab.py       # Drive, extração do dataset e download
+    ├── ambiente_colab.py       # Drive, extração do zip, caches e downloads
+    ├── fontes.py               # fontes de imagens além do EyePACS (treino e validação externa)
+    ├── datasets_externos.py    # leitores do DDR, APTOS, DeepDRiD e IDRiD
     ├── conjunto_dados.py       # CSV, rótulos e divisão treino/validação/teste
     ├── pre_processamento.py    # centralização da retina, cor de Ben Graham e máscara
     ├── pipeline_dados.py       # pipelines tf.data e data augmentation
     ├── modelo.py               # EfficientNet + GeM + cabeças binária e de grau
     ├── treinamento.py          # pesos de classe, callbacks e as duas fases
-    ├── avaliacao.py            # curvas, limiar, TTA, avaliação por olho e paciente
+    ├── metricas.py             # regras de medida (limiar, paciente, kappa, bootstrap)
+    ├── avaliacao.py            # predição com TTA, medida e exibição, por olho e paciente
     ├── diagnostico.py          # erros por grau, grau ≥ 2, agregação e bootstrap
-    └── analise.py              # análises das predições salvas, sem TensorFlow
+    ├── analise.py              # análises das predições salvas, sem TensorFlow
+    ├── execucao.py             # o pipeline de um treino e os treinos paralelos
+    └── modelo_final.py         # teste único e exportação para TFLite
 ```
 
 ## Organização no Google Drive
@@ -77,7 +86,7 @@ MyDrive/ProjetoRetinopatia/
 ├── resultados/       # uma pasta por execução (resumo.csv, predições, históricos…)
 │                     # + registro_experimentos.csv (consolidado)
 ├── relatorios/       # relatórios em PDF
-├── notebooks/        # cópias dos notebooks executados, com as saídas
+├── notebooks/        # cópias dos notebooks executados, com as saídas (feitas à mão)
 └── dados_internos/   # splits (mesma divisão para todos os treinos), caches de 448
                       # e probabilidades do professor da destilação
 

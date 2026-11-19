@@ -20,6 +20,11 @@ resultado:
 
 ## Como executar
 
+> Desde a refatoração de novembro de 2026 não há mais uma cópia de notebook por
+> execução: cada notebook tem um formulário na primeira célula. As cópias citadas
+> neste plano (`notebooks/execucoes/`) são as que rodaram e estão na tag
+> `v4-original`.
+
 1. **Caches (uma vez por tamanho).** Rode `notebooks/Preparar_Caches.ipynb`
    montando o Drive da conta pessoal, uma cópia para `R01_b0_512` e outra para
    `R02_b0_640`. Depois, compartilhe `ProjetoRetinopatia_caches` com a conta do
