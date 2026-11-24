@@ -104,6 +104,38 @@ class RegrasDeMedida(unittest.TestCase):
         )
         self.assertTrue(dentro.all())
 
+    def test_diferenca_pareada_de_um_modelo_com_ele_mesmo_e_zero(self):
+        import numpy as np
+
+        gerador = np.random.default_rng(0)
+        classes = gerador.integers(0, 2, 300)
+        probabilidades = np.clip(0.3 * classes + gerador.normal(0.35, 0.2, 300), 0, 1)
+
+        resultado = self.m.diferenca_pareada(classes, probabilidades, probabilidades, 0.9, 200, seed=1)
+
+        self.assertTrue((resultado["diferenca"] == 0).all())
+        self.assertTrue((resultado["ic95_inferior"] == 0).all())
+        self.assertTrue((resultado["ic95_superior"] == 0).all())
+
+    def test_diferenca_pareada_reconhece_o_modelo_melhor(self):
+        import numpy as np
+
+        gerador = np.random.default_rng(0)
+        classes = gerador.integers(0, 2, 600)
+        ruido = gerador.normal(0, 0.25, 600)
+
+        bom = np.clip(0.5 * classes + 0.25 + 0.3 * ruido, 0, 1)
+        fraco = np.clip(0.5 * classes + 0.25 + ruido, 0, 1)
+
+        resultado = self.m.diferenca_pareada(classes, bom, fraco, 0.9, 300, seed=1)
+
+        self.assertGreater(resultado.loc["roc_auc", "ic95_inferior"], 0)
+        self.assertGreater(resultado.loc["especificidade", "ic95_inferior"], 0)
+        self.assertAlmostEqual(
+            resultado.loc["roc_auc", "diferenca"],
+            resultado.loc["roc_auc", "a"] - resultado.loc["roc_auc", "b"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

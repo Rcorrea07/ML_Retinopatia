@@ -11,7 +11,9 @@ ou arquivos. Cada regra existe uma vez aqui e os outros módulos a usam:
   probabilidade dos dois olhos (`por_paciente`);
 - o kappa quadrático da cabeça de grau (`kappa_grau`);
 - as métricas num limiar fixo e os intervalos de confiança por
-  bootstrap de pacientes (`metricas_no_limiar`, `intervalos_bootstrap`).
+  bootstrap de pacientes (`metricas_no_limiar`, `intervalos_bootstrap`);
+- a comparação de dois modelos nos mesmos casos, com bootstrap pareado
+  (`diferenca_pareada`).
 """
 
 import numpy as np
@@ -212,5 +214,96 @@ def intervalos_bootstrap(
                 "ic95_inferior": inferior,
                 "ic95_superior": superior
             }
+
+    return pd.DataFrame(linhas).T
+
+
+def _roc_e_especificidade(classes, probabilidades, sensibilidade_desejada):
+    """
+    ROC-AUC e especificidade no ponto da sensibilidade desejada (NaN se
+    nenhum limiar a atinge).
+    """
+
+    _, _, especificidade = ponto_na_sensibilidade(
+        classes,
+        probabilidades,
+        sensibilidade_desejada
+    )
+
+    return {
+        "roc_auc": roc_auc_score(classes, probabilidades),
+        "especificidade": np.nan if especificidade is None else especificidade
+    }
+
+
+def diferenca_pareada(
+    classes,
+    probabilidades_a,
+    probabilidades_b,
+    sensibilidade_desejada,
+    numero_reamostragens,
+    seed
+):
+    """
+    Compara dois modelos nos mesmos casos (por exemplo, os pacientes da
+    validação): ROC-AUC e especificidade no ponto da sensibilidade
+    desejada de cada um, e a diferença A − B com o intervalo de 95% por
+    bootstrap pareado (os mesmos casos sorteados para os dois modelos;
+    em cada reamostragem, cada modelo escolhe o próprio limiar, como na
+    validação).
+
+    Retorna:
+        DataFrame indexado pela métrica, com as colunas `a`, `b`,
+        `diferenca`, `ic95_inferior` e `ic95_superior`
+    """
+
+    classes = np.asarray(classes).astype(int)
+    probabilidades_a = np.asarray(probabilidades_a)
+    probabilidades_b = np.asarray(probabilidades_b)
+
+    estimativas = {
+        nome: _roc_e_especificidade(classes, probabilidades, sensibilidade_desejada)
+        for nome, probabilidades in (("a", probabilidades_a), ("b", probabilidades_b))
+    }
+
+    gerador = np.random.default_rng(seed)
+    numero_casos = len(classes)
+    diferencas = []
+
+    for _ in range(numero_reamostragens):
+        sorteados = gerador.integers(0, numero_casos, numero_casos)
+
+        # Uma reamostragem com uma classe só não tem curva ROC
+        if classes[sorteados].min() == classes[sorteados].max():
+            continue
+
+        medida_a, medida_b = (
+            _roc_e_especificidade(
+                classes[sorteados],
+                probabilidades[sorteados],
+                sensibilidade_desejada
+            )
+            for probabilidades in (probabilidades_a, probabilidades_b)
+        )
+
+        diferencas.append({
+            metrica: medida_a[metrica] - medida_b[metrica]
+            for metrica in medida_a
+        })
+
+    diferencas = pd.DataFrame(diferencas)
+
+    linhas = {}
+
+    for metrica in ("roc_auc", "especificidade"):
+        inferior, superior = np.nanpercentile(diferencas[metrica], [2.5, 97.5])
+
+        linhas[metrica] = {
+            "a": estimativas["a"][metrica],
+            "b": estimativas["b"][metrica],
+            "diferenca": estimativas["a"][metrica] - estimativas["b"][metrica],
+            "ic95_inferior": inferior,
+            "ic95_superior": superior
+        }
 
     return pd.DataFrame(linhas).T

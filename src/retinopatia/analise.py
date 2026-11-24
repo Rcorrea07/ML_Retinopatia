@@ -114,6 +114,18 @@ def carregar_predicoes(pasta):
     return resultado
 
 
+def predicoes_do_modo(caminho, modo):
+    """
+    Tabela padronizada de um modo de TTA lida de um CSV no formato
+    atual (colunas `prob_doente_<modo>` e `grau_previsto_<modo>`), por
+    exemplo as predições de validação do R09.
+    """
+
+    tabela = pd.read_csv(caminho, dtype={"image": str, "patient_id": str})
+
+    return _tabela_modo(tabela, f"prob_doente_{modo}", f"grau_previsto_{modo}")
+
+
 def listar_execucoes(pasta_resultados=None):
     """
     Pastas de resultados com predições de validação da Fase 2, sem as
@@ -261,6 +273,70 @@ def tabela_comparativa(
         "paciente_especificidade",
         ascending=False
     ).reset_index(drop=True)
+
+
+def comparar_pareado(
+    tabela_a,
+    tabela_b,
+    numero_reamostragens=None,
+    seed=None,
+    sensibilidade_desejada=None
+):
+    """
+    Dois modelos nos mesmos pacientes da validação (tabelas de um modo,
+    como as de `carregar_predicoes`, ligadas pela coluna `image`): por
+    paciente, ROC-AUC e especificidade com sensibilidade ≥ 0,90 de cada
+    um e a diferença A − B, com intervalo de 95% por bootstrap pareado
+    de pacientes (`metricas.diferenca_pareada`). Para o modelo A ganhar,
+    o intervalo da diferença de especificidade fica acima de zero.
+
+    Retorna:
+        DataFrame indexado pela métrica (`a`, `b`, `diferenca`,
+        `ic95_inferior`, `ic95_superior`)
+    """
+
+    if numero_reamostragens is None:
+        numero_reamostragens = configuracao.NUMERO_BOOTSTRAP
+
+    if seed is None:
+        seed = configuracao.SEED_SPLIT
+
+    if sensibilidade_desejada is None:
+        sensibilidade_desejada = configuracao.SENSIBILIDADE_DESEJADA
+
+    juntas = tabela_a.merge(
+        tabela_b[["image", "prob", "target"]],
+        on="image",
+        suffixes=("_a", "_b"),
+        validate="one_to_one"
+    )
+
+    if len(juntas) != len(tabela_a) or len(juntas) != len(tabela_b):
+        raise ValueError(
+            f"As tabelas não têm as mesmas imagens ({len(tabela_a)}, "
+            f"{len(tabela_b)}, {len(juntas)} em comum)."
+        )
+
+    if (juntas["target_a"] != juntas["target_b"]).any():
+        raise ValueError("As duas tabelas discordam do rótulo de alguma imagem.")
+
+    pacientes = {
+        lado: regras.por_paciente(
+            juntas["patient_id"].values,
+            juntas["target_a"].values,
+            juntas[f"prob_{lado}"].values
+        )
+        for lado in ("a", "b")
+    }
+
+    return regras.diferenca_pareada(
+        pacientes["a"]["target"].values,
+        pacientes["a"]["valor"].values,
+        pacientes["b"]["valor"].values,
+        sensibilidade_desejada,
+        numero_reamostragens,
+        seed
+    )
 
 
 # ============================================================
