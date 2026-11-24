@@ -852,6 +852,63 @@ AMOSTRAS_PARIDADE_TFLITE = 200
 TOLERANCIA_INFERENCIA = 0.02
 
 # ============================================================
+# RETFOUND-GREEN (F10, retfound.py, PyTorch)
+# ============================================================
+
+# ViT-S/14 com 4 registradores, pré-treinada pelo DinoV2 e depois em 75
+# mil fotos de retina (AIROGS, DDR, ODIR) com reconstrução de tokens.
+# Licença dos pesos: só pesquisa não comercial, sem projeto com empresa
+# envolvida; nada dela vai para o app.
+# Repositório: https://github.com/justinengelmann/RETFound_Green
+URL_PESOS_RETFOUND = (
+    "https://github.com/justinengelmann/RETFound_Green/releases/download/"
+    "v0.1/retfoundgreen_statedict.pth"
+)
+
+# Baixados uma vez por sessão (87 MB), no disco local
+CAMINHO_PESOS_RETFOUND = "/content/pesos/retfoundgreen_statedict.pth"
+
+# Nome da arquitetura no timm, como no README do RETFound-Green
+ARQUITETURA_RETFOUND = "vit_small_patch14_reg4_dinov2"
+
+# Entrada do pré-treino: as imagens dos caches de TAMANHO_IMAGEM são
+# reduzidas para este tamanho. Escala 0–1, normalizada com média 0,5 e
+# desvio 0,5 nos três canais.
+TAMANHO_ENTRADA_RETFOUND = (392, 392)
+MEDIA_DESVIO_RETFOUND = (0.5, 0.5)
+
+# Uma ViT-S em 392 custa ~3,5× o B0 em 768 por imagem; o lote de 64 cabe
+# folgado numa A100 em bfloat16. Numa L4, use 32.
+TAMANHO_LOTE_RETFOUND = _valor("TAMANHO_LOTE_RETFOUND", 64)
+
+# Fine-tuning de ViT (receita do MAE e do DINOv2): AdamW, taxa por camada
+# que diminui em direção à entrada (`DECAIMENTO_CAMADAS_RETFOUND` por
+# bloco), decaimento de pesos fora dos vieses, normalizações e tokens,
+# stochastic depth e corte do gradiente. A Fase 1 (só as cabeças) usa
+# TAXA_APRENDIZADO_FASE1; a Fase 2 usa o mesmo cosseno com aquecimento
+# do treino do Keras (EPOCAS_FASE2, EPOCAS_AQUECIMENTO_FASE2,
+# FRACAO_LR_FINAL, PACIENCIA_EARLY_STOP_FASE2).
+TAXA_APRENDIZADO_RETFOUND = _valor("TAXA_APRENDIZADO_RETFOUND", 1e-4)
+DECAIMENTO_CAMADAS_RETFOUND = _valor("DECAIMENTO_CAMADAS_RETFOUND", 0.75)
+DECAIMENTO_PESOS_RETFOUND = 0.05
+TAXA_DROP_PATH_RETFOUND = 0.1
+LIMITE_GRADIENTE_RETFOUND = 1.0
+
+# Processos que leem e aumentam as imagens na CPU (A100 com RAM alta:
+# 12 núcleos)
+TRABALHADORES_DADOS_RETFOUND = min(12, os.cpu_count() or 1)
+
+# O modelo treinado (state_dict do PyTorch), ao lado dos .keras
+CAMINHO_MODELO_RETFOUND = os.path.splitext(CAMINHO_MODELO_FINAL)[0] + ".pt"
+
+# Predições de validação do modelo final (R12 semente 42) gravadas pelo
+# R09: a régua da comparação pareada
+CAMINHO_PREDICOES_VALIDACAO_R09 = os.path.join(
+    PASTA_RESULTADOS_R09,
+    "predicoes_validacao_modelo_final.csv"
+)
+
+# ============================================================
 # VÁRIOS TREINOS NA MESMA GPU (execucao.treinar_em_paralelo)
 # ============================================================
 

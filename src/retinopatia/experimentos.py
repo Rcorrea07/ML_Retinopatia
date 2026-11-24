@@ -157,6 +157,24 @@ EXPERIMENTOS = {
         "TAMANHO_IMAGEM": (768, 768),
         "MODO_TTA": "tta2",
     },
+
+    # --------------------------------------------------------
+    # F10: RETFound-Green (ViT-S/14 pré-treinada em 75 mil fotos de
+    # retina; Engelmann e Bernabeu, arXiv 2405.00117), em PyTorch
+    # (retfound.py, notebook RETFound_Green). Os mesmos dados de treino do
+    # R12, lidos dos caches de 768 (Ben) e reduzidos para a entrada de
+    # 392 da rede; a mesma validação. Só pesquisa: a licença não permite
+    # usar o modelo, nem um derivado dele, no app dos postos.
+    # Para ganhar do R12: maior especificidade por paciente com TTA2 na
+    # validação, com o intervalo pareado da diferença excluindo zero.
+    # --------------------------------------------------------
+
+    "F10_retfound_green": {
+        "BACKBONE": "RETFoundGreen",
+        "TAMANHO_IMAGEM": (768, 768),
+        "DATASETS_EXTERNOS": ["DDR", "APTOS", "DeepDRiD", "IDRiD"],
+        "MODO_TTA": "tta2",
+    },
 }
 
 
