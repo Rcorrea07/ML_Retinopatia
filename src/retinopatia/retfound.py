@@ -874,7 +874,10 @@ def comparar_com_r12(caminho_predicoes, caminho_r12=None):
     elif principal["ic95_superior"] < 0:
         veredito = "o R12 ganha"
     else:
-        veredito = "empate (o intervalo da diferença inclui zero)"
+        veredito = (
+            f"o {ROTULO} não ganha (o intervalo da diferença inclui zero; "
+            "nenhum dos dois se distingue com segurança nesta medida)"
+        )
 
     print(
         f"\nRegra ({configuracao.MODO_TTA}, especificidade por paciente): "

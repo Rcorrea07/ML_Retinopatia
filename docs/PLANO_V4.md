@@ -401,6 +401,38 @@ de pedir a permissão ao autor.
 
 Custo previsto: uma sessão A100 de ~1 h (fumaça de poucos minutos antes, na mesma sessão).
 
+### F10: resultado (24/11/2026, commit 11792c3)
+
+Fumaça numa T4 (lote 32, float16; 5,3 GB de GPU). Treino numa A100 de 40 GB (lote 64, bfloat16), pasta
+`resultados/F10_retfound_green_RETFoundGreen_768_prev3_seed42_extra_externos_11792c3_20261124_0357`,
+modelo `modelos/F10_retfound_green_RETFoundGreen_768_v3_extra_externos_11792c3_20261124_0357.pt`.
+99.305 imagens de treino, 3.514 de validação. Fase 1: 2 épocas (PR-AUC 0,625). Fase 2: as 12 épocas, sem
+parada antecipada; a PR-AUC por olho subiu de 0,817 para 0,880 (época 11) e estabilizou. Cada época levou
+~325 s com 10 GB de GPU: o gargalo foi a leitura das imagens na CPU, não a rede. Sessão de ~2 h 25 min.
+
+**Validação, por paciente (sensibilidade 0,90), contra o R12 semente 42 nos mesmos pacientes** (bootstrap
+pareado de 1.000 reamostragens; diferença = RETFound-Green − R12):
+
+| Modo | ROC-AUC RFG | ROC-AUC R12 | Diferença [IC 95%] | Espec. RFG | Espec. R12 | Diferença [IC 95%] |
+|---|---|---|---|---|---|---|
+| sem TTA | 0,916 | 0,928 | −0,013 [−0,023; −0,002] | 0,697 | 0,758 | −0,062 [−0,160; +0,012] |
+| TTA2 | 0,917 | 0,930 | −0,013 [−0,022; −0,003] | 0,660 | 0,801 | −0,141 [−0,191; +0,010] |
+| TTA4 | 0,918 | 0,930 | −0,012 [−0,022; −0,003] | 0,648 | 0,766 | −0,118 [−0,183; +0,022] |
+
+Por olho (TTA2): ROC-AUC 0,923, PR-AUC 0,884, especificidade 0,735. Grau 0 com 26,5% de olhos marcados,
+grau 1 com 70,0% detectados (o mesmo patamar do R10/R12), graus 2 a 4 com 95–100%. Kappa da cabeça de
+grau 0,839 (o mesmo do R12).
+
+**Veredito pela regra fixada:** o RETFound-Green **não ganha**. A especificidade por paciente com TTA2 é 14
+pontos menor que a do R12 (o intervalo pareado vai de −0,19 a +0,01, então a perda não é certa nessa
+medida), e a ROC-AUC é menor nos três modos com o intervalo inteiro abaixo de zero. O R12 continua o modelo
+final; o RETFound-Green não vira professor da destilação. Causas prováveis: a rede viu os caches com Ben
+(o pré-treino foi em fotos cruas) e trabalha em 392 px contra 768 do R12, perdendo lesões pequenas.
+Testar com fotos cruas custaria um cache novo (~2 h de processamento); fica registrado como hipótese, sem
+rodar.
+
+Custo: ~15 min de T4 na fumaça e ~2 h 25 min de A100, cerca de 14–17 unidades no total.
+
 ## Final
 
 1. Avaliar o modelo escolhido uma única vez no teste (`RETINOPATIA_AVALIAR_TESTE = "1"`).
