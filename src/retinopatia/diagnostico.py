@@ -130,7 +130,7 @@ def avaliar_referenciavel(
 
     print(
         "\nOs limiares deste alvo foram escolhidos na validação; "
-        "a linha do teste é a estimativa honesta."
+        f"a linha de {nome_medido} é a estimativa honesta."
     )
 
     return resultado
