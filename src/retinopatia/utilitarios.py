@@ -1,5 +1,9 @@
 """
 Utilitários gerais do projeto.
+
+O TensorFlow é importado dentro das funções que o usam: o treino do
+RETFound-Green (`retfound`, PyTorch) grava a configuração por aqui sem
+carregá-lo, e ele reservaria a memória da GPU.
 """
 
 import json
@@ -7,8 +11,6 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
-
-import tensorflow as tf
 
 from . import configuracao
 
@@ -28,6 +30,8 @@ def configurar_sementes(
 
     if deterministico is None:
         deterministico = configuracao.OPERACOES_DETERMINISTICAS
+
+    import tensorflow as tf
 
     # Mantém o valor da semente registrado no ambiente
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -56,6 +60,8 @@ def _ativar_determinismo():
     Ativa as operações determinísticas, se o ambiente permitir.
     """
 
+    import tensorflow as tf
+
     try:
         tf.config.experimental.enable_op_determinism()
 
@@ -81,6 +87,8 @@ def configurar_precisao_mista(ativa=None):
 
     if ativa is None:
         ativa = configuracao.PRECISAO_MISTA
+
+    import tensorflow as tf
 
     politica = "mixed_float16" if ativa else "float32"
 
@@ -108,15 +116,34 @@ def _git(*argumentos):
         return None
 
 
-def _descrever_ambiente():
+def _ambiente_tensorflow():
     """
-    Commit do código, alterações não commitadas, data, GPU e versão do
-    TensorFlow da execução.
+    GPU e versão do TensorFlow da execução.
+    """
+
+    import tensorflow as tf
+
+    gpus = tf.config.list_physical_devices("GPU")
+
+    return {
+        "gpu": [
+            tf.config.experimental.get_device_details(gpu).get("device_name")
+            for gpu in gpus
+        ],
+        "versao_tensorflow": tf.__version__
+    }
+
+
+def _descrever_ambiente(ambiente_ml=None):
+    """
+    Commit do código, alterações não commitadas e data da execução, mais
+    a GPU e as bibliotecas de `ambiente_ml` (padrão: as do TensorFlow).
     """
 
     alteracoes = _git("status", "--porcelain", "--", ".")
 
-    gpus = tf.config.list_physical_devices("GPU")
+    if ambiente_ml is None:
+        ambiente_ml = _ambiente_tensorflow()
 
     return {
         "commit": _git("rev-parse", "HEAD"),
@@ -126,16 +153,13 @@ def _descrever_ambiente():
         # cópia em codigo_src.zip sim
         "codigo_alterado_sem_commit": bool(alteracoes),
         "data_execucao": datetime.now().isoformat(timespec="seconds"),
-        "gpu": [
-            tf.config.experimental.get_device_details(gpu).get("device_name")
-            for gpu in gpus
-        ],
-        "versao_tensorflow": tf.__version__
+        **ambiente_ml
     }
 
 
 def salvar_configuracao(
-    pasta_resultados=None
+    pasta_resultados=None,
+    ambiente_ml=None
 ):
     """
     Registra na pasta do experimento tudo o que é preciso para saber
@@ -145,6 +169,9 @@ def salvar_configuracao(
       nomes em maiúsculas) e o ambiente (commit, GPU, data);
     - `codigo_src.zip`: uma cópia do pacote `retinopatia` como estava na
       execução, inclusive edições feitas sem commit.
+
+    `ambiente_ml` descreve a GPU e as bibliotecas de aprendizado (padrão:
+    as do TensorFlow; o treino em PyTorch passa as suas).
     """
 
     if pasta_resultados is None:
@@ -172,7 +199,7 @@ def salvar_configuracao(
         if nome.isupper() and not nome.startswith("_")
     }
 
-    constantes["AMBIENTE"] = _descrever_ambiente()
+    constantes["AMBIENTE"] = _descrever_ambiente(ambiente_ml)
 
     with open(caminho, "w", encoding="utf-8") as arquivo:
         json.dump(
