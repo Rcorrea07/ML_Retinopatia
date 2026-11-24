@@ -389,7 +389,8 @@ usuário: sem cache novo; o pré-treino viu fotos sem Ben, então a rede pode re
 a do Keras (o mesmo aumento de dados, pesos das classes, BCE + 0,5 · Huber do grau, Fase 1 só nas cabeças
 por 2 épocas, Fase 2 com cosseno e 1 época de aquecimento, até 12 épocas, checkpoint e parada pela PR-AUC
 da validação) com o que uma ViT pede: AdamW, taxa máxima 1e-4 com decaimento por camada de 0,75,
-decaimento de pesos 0,05, stochastic depth 0,1, corte do gradiente em 1, bfloat16, lote de 64. O teste
+decaimento de pesos 0,05, stochastic depth 0,1, corte do gradiente em 1, bfloat16, lote de 64 (numa GPU de menos de 40 GB, lote de 32; na T4, float16 com
+escalonamento da perda: a primeira fumaça, numa T4, estourou a memória com o lote de 64). O teste
 fica fechado.
 
 **Regra fixada antes de rodar:** o RETFound-Green ganha se a especificidade por paciente com TTA2 na

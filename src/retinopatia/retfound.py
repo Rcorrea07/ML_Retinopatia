@@ -107,7 +107,7 @@ def pesos_classes(classes):
     if (contagens == 0).any():
         raise ValueError(f"O treino precisa das duas classes: contagens {contagens}.")
 
-    return {classe: len(classes) / (2 * contagens[classe]) for classe in (0, 1)}
+    return {classe: float(len(classes) / (2 * contagens[classe])) for classe in (0, 1)}
 
 
 def aumentar(img, gerador, parametros=None, cor_fundo=None):
@@ -228,6 +228,49 @@ def iniciar_trabalhador(_):
     informacao.dataset.gerador = np.random.default_rng(informacao.seed % 2**32)
 
 
+def memoria_gpu_gb():
+    """
+    Memória total da GPU em GB (0 sem GPU).
+    """
+
+    import torch
+
+    if not torch.cuda.is_available():
+        return 0.0
+
+    return torch.cuda.get_device_properties(0).total_memory / 1e9
+
+
+def tamanho_lote():
+    """
+    O lote de `TAMANHO_LOTE_RETFOUND` nas GPUs grandes (A100) e
+    `TAMANHO_LOTE_RETFOUND_GPU_PEQUENA` nas de menos de
+    `MEMORIA_LOTE_CHEIO_RETFOUND_GB` (L4, T4), quando o Colab não oferece
+    a A100. O lote usado vai para o resumo da execução.
+    """
+
+    if memoria_gpu_gb() >= configuracao.MEMORIA_LOTE_CHEIO_RETFOUND_GB:
+        return configuracao.TAMANHO_LOTE_RETFOUND
+
+    return configuracao.TAMANHO_LOTE_RETFOUND_GPU_PEQUENA
+
+
+def precisao():
+    """
+    Tipo dos cálculos em precisão mista: bfloat16 nas GPUs que o têm
+    (capacidade 8 ou mais: A100, L4) e float16 nas outras (T4). O
+    `torch.cuda.is_bf16_supported()` diz sim também na T4, por emulação
+    lenta e sem a atenção fundida; por isso a conferência é pela
+    capacidade.
+    """
+
+    import torch
+
+    principal, _ = torch.cuda.get_device_capability(0)
+
+    return torch.bfloat16 if principal >= 8 else torch.float16
+
+
 def criar_carregador(df, treino, pesos=None):
     """
     DataLoader de um conjunto: embaralha só no treino (a validação fica
@@ -240,7 +283,7 @@ def criar_carregador(df, treino, pesos=None):
 
     return torch.utils.data.DataLoader(
         ImagensRetina(df, treino, pesos),
-        batch_size=configuracao.TAMANHO_LOTE_RETFOUND,
+        batch_size=tamanho_lote(),
         shuffle=treino,
         drop_last=treino,
         num_workers=trabalhadores,
@@ -516,7 +559,7 @@ def prever_variantes(rede, carregador, numero_variantes=4):
 
     rede.eval()
 
-    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+    with torch.inference_mode(), torch.autocast("cuda", dtype=precisao()):
         for imagens, *_ in carregador:
             imagens = imagens.to(dispositivo, non_blocking=True)
 
@@ -602,6 +645,11 @@ def treinar_fase(
 
     parametros = [p for grupo in otimizador.param_groups for p in grupo["params"]]
 
+    # Em float16 (T4) a perda é escalada para os gradientes pequenos não
+    # virarem zero; em bfloat16 o escalonamento fica desligado
+    tipo = precisao()
+    escalonador = torch.amp.GradScaler("cuda", enabled=tipo == torch.float16)
+
     melhor, melhor_estado, sem_melhora = -np.inf, None, 0
     linhas = []
     passo = 0
@@ -634,7 +682,7 @@ def treinar_fase(
                 t.to(dispositivo, non_blocking=True).float() for t in (classes, graus, pesos)
             )
 
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with torch.autocast("cuda", dtype=tipo):
                 logits, graus_previstos = rede(imagens)
 
             perda = _perda(logits.float(), graus_previstos.float(), classes, graus, pesos)
@@ -643,9 +691,11 @@ def treinar_fase(
                 raise FloatingPointError(f"Perda não finita na fase {fase}, época {epoca}.")
 
             otimizador.zero_grad(set_to_none=True)
-            perda.backward()
+            escalonador.scale(perda).backward()
+            escalonador.unscale_(otimizador)
             torch.nn.utils.clip_grad_norm_(parametros, configuracao.LIMITE_GRADIENTE_RETFOUND)
-            otimizador.step()
+            escalonador.step(otimizador)
+            escalonador.update()
 
             soma_perda += perda.detach()
             lotes += 1
@@ -869,6 +919,11 @@ def executar():
 
     print("Experimento:", configuracao.NOME_EXPERIMENTO)
 
+    print(
+        f"GPU: {torch.cuda.get_device_name(0)} ({memoria_gpu_gb():.0f} GB); "
+        f"lote {tamanho_lote()}, precisão {str(precisao()).replace('torch.', '')}"
+    )
+
     configurar_sementes()
 
     caminho_pesos = baixar_pesos()
@@ -911,7 +966,8 @@ def executar():
     avaliacao.registrar_experimento(
         resultado,
         extras={
-            "tamanho_lote": configuracao.TAMANHO_LOTE_RETFOUND,
+            "tamanho_lote": tamanho_lote(),
+            "precisao": str(precisao()).replace("torch.", ""),
             "tamanho_entrada": configuracao.TAMANHO_ENTRADA_RETFOUND[0],
             "modelo_avaliado": os.path.basename(configuracao.CAMINHO_MODELO_RETFOUND)
         }

@@ -878,8 +878,13 @@ TAMANHO_ENTRADA_RETFOUND = (392, 392)
 MEDIA_DESVIO_RETFOUND = (0.5, 0.5)
 
 # Uma ViT-S em 392 custa ~3,5× o B0 em 768 por imagem; o lote de 64 cabe
-# folgado numa A100 em bfloat16. Numa L4, use 32.
+# folgado numa A100 em bfloat16. Quando o Colab só oferece uma GPU de
+# menos memória (L4, T4), o lote cai para o menor (retfound.tamanho_lote):
+# na T4 (15 GB, sem bfloat16) o lote de 64 estourou a memória na fumaça
+# de 24/11/2026.
 TAMANHO_LOTE_RETFOUND = _valor("TAMANHO_LOTE_RETFOUND", 64)
+TAMANHO_LOTE_RETFOUND_GPU_PEQUENA = 32
+MEMORIA_LOTE_CHEIO_RETFOUND_GB = 40
 
 # Fine-tuning de ViT (receita do MAE e do DINOv2): AdamW, taxa por camada
 # que diminui em direção à entrada (`DECAIMENTO_CAMADAS_RETFOUND` por
