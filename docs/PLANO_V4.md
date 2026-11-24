@@ -370,6 +370,36 @@ não de discriminação. Ajustar o limiar no próprio Messidor-2 deixaria a medi
 de ser externa; o caminho honesto é decidir a regra de limiar com a
 orientadora e, se mudar, medir de novo numa base ainda não usada (mBRSET).
 
+## F10: RETFound-Green contra o R12
+
+Preparado em 23/11/2026 (`src/retinopatia/retfound.py`, notebook `RETFound_Green.ipynb`, experimento
+`F10_retfound_green`). O RETFound-Green (Engelmann e Bernabeu, arXiv 2405.00117;
+https://github.com/justinengelmann/RETFound_Green) é uma ViT-S/14 pré-treinada pelo DinoV2 e depois em
+75 mil fotos de retina (AIROGS, DDR, ODIR), com entrada de 392 px. No artigo ela é avaliada por sonda
+linear em BRSET, IDRiD e ROP.
+
+**Licença:** os pesos só podem ser usados em pesquisa não comercial, sem projeto com empresa envolvida;
+um derivado tem de sair com licença não comercial. O app vai para os postos de Santa Rita (serviço, não
+pesquisa), então o RETFound-Green fica **só como comparação** na IC: nem ele nem um B0 destilado dele vão
+para o app sem permissão escrita do autor (decisão do usuário, 23/11).
+
+**Como roda:** em PyTorch, sem TensorFlow na sessão. Os mesmos dados de treino do R12 (EyePACS, extras de
+2015, DDR, APTOS, DeepDRiD, IDRiD), lidos dos caches de 768 px com Ben e reduzidos para 392 (decisão do
+usuário: sem cache novo; o pré-treino viu fotos sem Ben, então a rede pode render menos). A receita segue
+a do Keras (o mesmo aumento de dados, pesos das classes, BCE + 0,5 · Huber do grau, Fase 1 só nas cabeças
+por 2 épocas, Fase 2 com cosseno e 1 época de aquecimento, até 12 épocas, checkpoint e parada pela PR-AUC
+da validação) com o que uma ViT pede: AdamW, taxa máxima 1e-4 com decaimento por camada de 0,75,
+decaimento de pesos 0,05, stochastic depth 0,1, corte do gradiente em 1, bfloat16, lote de 64. O teste
+fica fechado.
+
+**Regra fixada antes de rodar:** o RETFound-Green ganha se a especificidade por paciente com TTA2 na
+validação for maior que a do R12 semente 42 (0,801), com o intervalo de 95% da diferença por bootstrap
+pareado de pacientes acima de zero (`comparacao_r12.csv`). O R12 s42 foi escolhido entre duas sementes por
+essa mesma medida, então a régua o favorece um pouco. Se ganhar com folga, a destilação no B0 só vem depois
+de pedir a permissão ao autor.
+
+Custo previsto: uma sessão A100 de ~1 h (fumaça de poucos minutos antes, na mesma sessão).
+
 ## Final
 
 1. Avaliar o modelo escolhido uma única vez no teste (`RETINOPATIA_AVALIAR_TESTE = "1"`).
