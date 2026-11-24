@@ -328,6 +328,48 @@ por grau e os três modos de TTA.
 Custo previsto: uma sessão A100 curta (extrair e processar 1.748 fotos e prever),
 menos de 1 h.
 
+### V01: resultado (19/11/2026, commit 967e383)
+
+Rodou numa L4 (sem A100 livre), pasta
+`resultados/V01_r12_messidor2_EfficientNetB0_768_prev3_seed42_extra_967e383_20261119_1226`.
+Os limiares refeitos das predições do R09 bateram com os gravados (0,1926 e
+0,2837), o que confere a refatoração de ponta a ponta. 1.748 fotos processadas,
+1.744 graduáveis (4 de fora), 870 pacientes com os dois olhos graduáveis. O
+cache do Messidor-2 não foi gravado (processado na sessão).
+
+**Desfecho principal** (por paciente, dois olhos graduáveis, TTA2, IC 95% por
+bootstrap de 1.000 reamostragens de pacientes):
+
+| Métrica | Messidor-2 | Teste do EyePACS (R09) |
+|---|---|---|
+| ROC-AUC | 0,928 [0,909; 0,944] | 0,934 [0,920; 0,947] |
+| Sensibilidade | 0,948 [0,926; 0,967] | 0,894 |
+| Especificidade | 0,559 [0,516; 0,604] | 0,795 [0,772; 0,817] |
+
+**Secundários:**
+
+- Por olho: ROC-AUC 0,940 [0,927; 0,952], sensibilidade 0,955, especificidade
+  0,576.
+- Todos os 874 pacientes com algum olho graduável: sensibilidade 0,95,
+  especificidade 0,563.
+- Por grau (olho, limiar 0,1926): grau 0 com 42,3% marcados (falsos positivos),
+  grau 1 com 88,9% detectados, grau 2 com 99,1%, graus 3 e 4 com 100%.
+- Retinopatia referenciável (grau ≥ 2, limiar da validação do EyePACS): por
+  paciente ROC-AUC 0,976, sensibilidade 0,970, especificidade 0,771; por olho
+  0,975 / 0,974 / 0,741.
+- Modos de TTA por paciente (cada um com o seu limiar da validação): sem TTA
+  0,927 / 0,957 / 0,512; TTA2 0,928 / 0,948 / 0,563; TTA4 0,928 / 0,953 / 0,514
+  (ROC / sensibilidade / especificidade). TTA2 continua o melhor.
+- Kappa quadrático da cabeça de grau: 0,817.
+
+**Leitura:** a ordenação dos casos generaliza (ROC-AUC dentro do intervalo do
+teste do EyePACS, e acima dele no referenciável), mas o limiar escolhido no
+EyePACS cai baixo demais no Messidor-2: a sensibilidade sobe e a especificidade
+desaba (0,795 → 0,559). É uma mudança de calibração entre câmeras e populações,
+não de discriminação. Ajustar o limiar no próprio Messidor-2 deixaria a medida
+de ser externa; o caminho honesto é decidir a regra de limiar com a
+orientadora e, se mudar, medir de novo numa base ainda não usada (mBRSET).
+
 ## Final
 
 1. Avaliar o modelo escolhido uma única vez no teste (`RETINOPATIA_AVALIAR_TESTE = "1"`).
