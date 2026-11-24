@@ -431,7 +431,8 @@ final; o RETFound-Green não vira professor da destilação. Causas prováveis: 
 Testar com fotos cruas custaria um cache novo (~2 h de processamento); fica registrado como hipótese, sem
 rodar.
 
-Custo: ~15 min de T4 na fumaça e ~2 h 25 min de A100, cerca de 14–17 unidades no total.
+Custo: ~15 min de T4 na fumaça e ~2 h 25 min de A100, cerca de 14–17 unidades no total (estimativa pelo
+tempo; o saldo não foi lido antes). Saldo medido depois, com nenhuma sessão ativa: 884,8 unidades (24/11/2026).
 
 ## Final
 
